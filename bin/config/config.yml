@@ -1,6 +1,11 @@
+OPCClient:
+  server: opc.tcp://localhost:4840
+  interval: 1000
+  nodes: ["the.answer","the.answer1"]
+
 Logger:
   path: ./logs
-  rotateSize: 100 #单位MB
+  rotateSize: 100 #MB
   maxFiles: 100;
   level: 1 #0:trace,1:debug,2:info,3:warn,4:error,5:critical,6:off
 

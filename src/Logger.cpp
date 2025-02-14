@@ -21,17 +21,19 @@ Logger::Logger() {
     uint32_t maxFiles = 100;
     YAML::Node config = YAML::LoadFile("./config/config.yml");
     if (!config.IsNull()) {
-        if (config["level"]) {
-            logLevel = config["level"].as<uint32_t>();
-        }
-        if (config["rotateSize"]) {
-            rotateSize = config["rotateSize"].as<uint32_t>();
-        }
-        if (config["maxFiles"]) {
-            maxFiles = config["maxFiles"].as<uint32_t>();
-        }
-        if (config["path"]) {
-            logPath = config["path"].as<std::string>();
+        if (config["logger"]) {
+            if (config["level"]) {
+                logLevel = config["level"].as<uint32_t>();
+            }
+            if (config["rotateSize"]) {
+                rotateSize = config["rotateSize"].as<uint32_t>();
+            }
+            if (config["maxFiles"]) {
+                maxFiles = config["maxFiles"].as<uint32_t>();
+            }
+            if (config["path"]) {
+                logPath = config["path"].as<std::string>();
+            }
         }
     }
     mpThreadPool = std::make_shared<spdlog::details::thread_pool>(2,2);
