@@ -7,12 +7,6 @@
 
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
-
     OPCClient client;
-    client.connect("opc.tcp://localhost:4840");
-    client.setInterval(1000);
-    client.setNodeIds({{"the.answer","string"}});
-
-
     return a.exec();
 }

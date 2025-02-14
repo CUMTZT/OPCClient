@@ -19,22 +19,28 @@ Logger::Logger() {
     std::string logPath = "./logs";
     uint32_t rotateSize = 100;
     uint32_t maxFiles = 100;
-    YAML::Node config = YAML::LoadFile("./config/config.yml");
-    if (!config.IsNull()) {
-        if (config["logger"]) {
-            if (config["level"]) {
-                logLevel = config["level"].as<uint32_t>();
-            }
-            if (config["rotateSize"]) {
-                rotateSize = config["rotateSize"].as<uint32_t>();
-            }
-            if (config["maxFiles"]) {
-                maxFiles = config["maxFiles"].as<uint32_t>();
-            }
-            if (config["path"]) {
-                logPath = config["path"].as<std::string>();
+    try {
+        YAML::Node config = YAML::LoadFile("./config/config.yml");
+        if (!config.IsNull()) {
+            if (config["Logger"]) {
+                auto loggerNode = config["Logger"];
+                if (loggerNode["level"]) {
+                    logLevel = loggerNode["level"].as<uint32_t>();
+                }
+                if (loggerNode["rotateSize"]) {
+                    rotateSize = loggerNode["rotateSize"].as<uint32_t>();
+                }
+                if (loggerNode["maxFiles"]) {
+                    maxFiles = loggerNode["maxFiles"].as<uint32_t>();
+                }
+                if (loggerNode["path"]) {
+                    logPath = loggerNode["path"].as<std::string>();
+                }
             }
         }
+    }
+    catch (const std::exception& e) {
+        LogErr("{}",e.what());
     }
     mpThreadPool = std::make_shared<spdlog::details::thread_pool>(2,2);
     mpFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logPath + "/log.log",1024 * 1024 * rotateSize,maxFiles);

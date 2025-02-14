@@ -4,6 +4,7 @@
 #include "OPCClient.h"
 #include <rapidjson/document.h>
 #include "Logger.h"
+#include <yaml-cpp/yaml.h>
 
 OPCClient::OPCClient(QObject *parent) : QObject(parent) {
     mpThread = new QThread();
@@ -12,11 +13,33 @@ OPCClient::OPCClient(QObject *parent) : QObject(parent) {
     mpTimer = new QTimer();
     mpTimer->setInterval(1000);
     QObject::connect(mpTimer,&QTimer::timeout,this,&OPCClient::onTimerTimeout);
+    try {
+        YAML::Node config = YAML::LoadFile("./config/config.yml");
+        if (config["OPCClient"]) {
+            auto opcNode = config["OPCClient"];
+            if (opcNode["server"]) {
+                mUrl = QString::fromStdString(opcNode["server"].as<std::string>());
+            }
+            if (opcNode["interval"]) {
+                const int interval = opcNode["interval"].as<int>();
+                setInterval(interval);
+            }
+            if (opcNode["nodes"]) {
+                for (int i = 0; i < opcNode["nodes"].size(); i++) {
+                    mNodeIds.append(QString::fromStdString(opcNode["nodes"][i].as<std::string>()));
+                }
+            }
+        }
+        LogWarn("{}","Config File Not Content OPC configure!");
+    }
+    catch (const std::exception &e) {
+        LogErr("{}",e.what());
+    }
     mpTimer->start();
 }
 
 OPCClient::~OPCClient() {
-    std::scoped_lock<std::recursive_mutex> lock(mClientLocker);
+    std::scoped_lock lock(mClientLocker);
     UA_Client_delete(mpClient);
     mpClient = nullptr;
     mpThread->deleteLater();
@@ -24,7 +47,7 @@ OPCClient::~OPCClient() {
 }
 
 void OPCClient::connect(const QString &url) {
-    std::scoped_lock<std::recursive_mutex> lock(mClientLocker);
+    std::scoped_lock lock(mClientLocker);
     mUrl = url;
     if (url.isEmpty()) {
         UA_Client_delete(mpClient);
@@ -53,7 +76,7 @@ void OPCClient::setNodeIds(const QStringList& nodeIds){
 }
 
 void OPCClient::onTimerTimeout() {
-    std::scoped_lock<std::recursive_mutex> lock(mClientLocker);
+    std::scoped_lock lock(mClientLocker);
     if (nullptr == mpClient) {
         connect(mUrl);
     }
@@ -113,7 +136,7 @@ void OPCClient::onTimerTimeout() {
                 if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_BYTESTRING])) {
                     strValue = QString((char*)((UA_String *) value.data)->data);
                 }
-                LogDebug("{}",strValue.toStdString());
+                LogErr("{} : {}",id.toStdString(),strValue.toStdString());
 
                 int value_ = strValue.toInt();
                 value_++;

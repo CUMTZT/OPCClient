@@ -25,5 +25,7 @@ target_link_libraries(OPCClient
         Qt6::Core
         -lopen62541
         -lyaml-cpp
-        -lcppkafka)
+        -lcppkafka
+        -lspdlog
+        -lfmt)
 
