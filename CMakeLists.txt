@@ -19,7 +19,9 @@ add_executable(OPCClient
         include/Logger.h
         src/Logger.cpp
         include/KafkaProduder.h
-        src/KafkaProduder.cpp)
+        src/KafkaProduder.cpp
+        include/OPCClientManager.h
+        src/OPCClientManager.cpp)
 
 target_link_libraries(OPCClient
         Qt6::Core

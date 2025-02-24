@@ -8,12 +8,12 @@
 #include <open62541/client_config_default.h>
 #include <cstdio>
 #include <open62541/client.h>
-#include <open62541/client_highlevel.h>
-#include <QObject>
 #include <mutex>
 #include <QTimer>
 #include <QStringList>
 #include <QThread>
+#include <yaml-cpp/node/convert.h>
+
 class OPCClient : public QObject{
 
     Q_OBJECT
@@ -24,11 +24,17 @@ public:
 
     ~OPCClient()override;
 
-    void connect(const QString& url);
+    void setUrl(const QString& url);
+
+    QString getURL();
 
     void setInterval(int interval);
 
+    int getInterval();
+
     void setNodeIds(const QStringList& nodeIds);
+
+    QStringList getNodeIds();
 
 private slots:
 

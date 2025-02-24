@@ -5,6 +5,7 @@
 #include <rapidjson/document.h>
 #include "Logger.h"
 #include <yaml-cpp/yaml.h>
+#include <open62541/client_highlevel.h>
 
 OPCClient::OPCClient(QObject *parent) : QObject(parent) {
     mpThread = new QThread();
@@ -12,29 +13,7 @@ OPCClient::OPCClient(QObject *parent) : QObject(parent) {
     mpThread->start();
     mpTimer = new QTimer();
     mpTimer->setInterval(1000);
-    QObject::connect(mpTimer,&QTimer::timeout,this,&OPCClient::onTimerTimeout);
-    try {
-        YAML::Node config = YAML::LoadFile("./config/config.yml");
-        if (config["OPCClient"]) {
-            auto opcNode = config["OPCClient"];
-            if (opcNode["server"]) {
-                mUrl = QString::fromStdString(opcNode["server"].as<std::string>());
-            }
-            if (opcNode["interval"]) {
-                const int interval = opcNode["interval"].as<int>();
-                setInterval(interval);
-            }
-            if (opcNode["nodes"]) {
-                for (int i = 0; i < opcNode["nodes"].size(); i++) {
-                    mNodeIds.append(QString::fromStdString(opcNode["nodes"][i].as<std::string>()));
-                }
-            }
-        }
-        LogWarn("{}","Config File Not Content OPC configure!");
-    }
-    catch (const std::exception &e) {
-        LogErr("{}",e.what());
-    }
+    connect(mpTimer,&QTimer::timeout,this,&OPCClient::onTimerTimeout);
     mpTimer->start();
 }
 
@@ -46,7 +25,11 @@ OPCClient::~OPCClient() {
     mpThread = nullptr;
 }
 
-void OPCClient::connect(const QString &url) {
+QString OPCClient::getURL() {
+    return mUrl;
+}
+
+void OPCClient::setUrl(const QString &url) {
     std::scoped_lock lock(mClientLocker);
     mUrl = url;
     if (url.isEmpty()) {
@@ -71,14 +54,22 @@ void OPCClient::setInterval(int interval) {
     mpTimer->setInterval(interval);
 }
 
+int OPCClient::getInterval() {
+    return mpTimer->interval();
+}
+
 void OPCClient::setNodeIds(const QStringList& nodeIds){
     mNodeIds = nodeIds;
+}
+
+QStringList OPCClient::getNodeIds() {
+    return mNodeIds;
 }
 
 void OPCClient::onTimerTimeout() {
     std::scoped_lock lock(mClientLocker);
     if (nullptr == mpClient) {
-        connect(mUrl);
+        setUrl(mUrl);
     }
     if (nullptr != mpClient) {
         for(const auto& id : mNodeIds) {
@@ -142,7 +133,7 @@ void OPCClient::onTimerTimeout() {
                 value_++;
                 UA_Variant *myVariant = UA_Variant_new();
                 UA_Variant_setScalarCopy(myVariant, &value_, &UA_TYPES[UA_TYPES_INT32]);
-                UA_Client_writeValueAttribute(mpClient, UA_NODEID_STRING(1, "the.answer"), myVariant);
+                UA_Client_writeValueAttribute(mpClient, UA_NODEID_STRING(1, const_cast<char*>("the.answer")), myVariant);
                 UA_Variant_delete(myVariant);
             }
             UA_Variant_clear(&value);
