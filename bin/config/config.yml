@@ -1,6 +1,6 @@
 OPCClients:
   -
-    name: 1-4号机组节点
+    name: 1-4
     server: opc.tcp://localhost:4840
     interval: 1000
     nodes: ["the.answer","the.answer1"]

@@ -2,8 +2,8 @@
 // Created by cumtzt on 25-1-21.
 //
 
-#ifndef KAFKAPRODUDER_H
-#define KAFKAPRODUDER_H
+#ifndef KAFKAPRODUCER_H
+#define KAFKAPRODUCER_H
 
 #include <QObject>
 #include <cppkafka/producer.h>
@@ -39,4 +39,4 @@ private:
 
 };
 
-#endif //KAFKAPRODUDER_H
+#endif //KAFKAPRODUCER_H

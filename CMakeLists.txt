@@ -18,8 +18,8 @@ add_executable(OPCClient
         src/OPCClient.cpp
         include/Logger.h
         src/Logger.cpp
-        include/KafkaProduder.h
-        src/KafkaProduder.cpp
+        include/KafkaProducer.h
+        src/KafkaProducer.cpp
         include/OPCClientManager.h
         src/OPCClientManager.cpp)
 
