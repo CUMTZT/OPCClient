@@ -8,5 +8,6 @@
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
     OPCClient client;
+    client.setUrl("opc.tcp://localhost:4840");
     return a.exec();
 }

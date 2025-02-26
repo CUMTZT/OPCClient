@@ -8,6 +8,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 find_package(Qt6 REQUIRED COMPONENTS Core)
 set(CMAKE_AUTOMOC ON)
 
+find_package(spdlog REQUIRED)
+
 include_directories(
         ${PROJECT_SOURCE_DIR}/include
 )
@@ -25,9 +27,9 @@ add_executable(OPCClient
 
 target_link_libraries(OPCClient
         Qt6::Core
+        spdlog::spdlog
+        -lopen62541pp
         -lopen62541
         -lyaml-cpp
-        -lcppkafka
-        -lspdlog
-        -lfmt)
+        -lcppkafka)
 

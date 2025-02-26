@@ -5,9 +5,8 @@
 #ifndef OPCCLIENT_OPCCLIENT_H
 #define OPCCLIENT_OPCCLIENT_H
 
-#include <open62541/client_config_default.h>
+#include <open62541pp/open62541pp.hpp>
 #include <cstdio>
-#include <open62541/client.h>
 #include <mutex>
 #include <QTimer>
 #include <QStringList>
@@ -46,7 +45,7 @@ private:
 
     QString mUrl;
 
-    UA_Client *mpClient = nullptr;
+    opcua::Client *mpClient = nullptr;
 
     std::recursive_mutex mClientLocker;
 

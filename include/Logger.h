@@ -8,7 +8,6 @@
 #include <spdlog/async_logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <QString>
-#include <fmt/format.h>
 #include <spdlog/async.h>
 class Logger{
 
@@ -48,7 +47,8 @@ private:
 
 #define LoggerIns Logger::getInstance()
 #define LogTrace(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__,spdlog::level::trace)
-#define LogDebug(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::info)
+#define LogDebug(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::debug)
+#define LogInfo(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::info)
 #define LogWarn(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::warn)
 #define LogErr(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::err)
 #define LogCritical(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::critical)
