@@ -9,5 +9,6 @@ int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
     OPCClient client;
     client.setUrl("opc.tcp://localhost:4840");
+    client.setNodeIds({"1000"});
     return a.exec();
 }

@@ -12,7 +12,7 @@ OPCClient::OPCClient(QObject *parent) : QObject(parent) {
     mpThread->start();
     mpTimer = new QTimer();
     mpTimer->setInterval(1000);
-    connect(mpTimer,&QTimer::timeout,this,&OPCClient::onTimerTimeout);
+    connect(mpTimer, &QTimer::timeout, this, &OPCClient::onTimerTimeout);
     mpTimer->start();
 }
 
@@ -43,7 +43,12 @@ void OPCClient::setUrl(const QString &url) {
         return;
     }
     mpClient = new opcua::Client();
-    mpClient->connect(mUrl.toStdString());
+    try {
+        mpClient->connect(mUrl.toStdString());
+    } catch (const std::exception &e) {
+        delete mpClient;
+        mpClient = nullptr;
+    }
     if (!mpClient->isConnected()) {
         delete mpClient;
         mpClient = nullptr;
@@ -58,7 +63,7 @@ int OPCClient::getInterval() {
     return mpTimer->interval();
 }
 
-void OPCClient::setNodeIds(const QStringList& nodeIds){
+void OPCClient::setNodeIds(const QStringList &nodeIds) {
     mNodeIds = nodeIds;
 }
 
@@ -73,11 +78,37 @@ void OPCClient::onTimerTimeout() {
     }
     if (nullptr != mpClient) {
         try {
-            opcua::Node node(*mpClient, opcua::ObjectId::RootFolder);
-            auto node_ = node.browseChild({{1,"the.answer"}});
-        }
-        catch (std::exception& e) {
-            LogErr("{}",e.what());
+            for (auto nodeId: mNodeIds) {
+                opcua::Node node(*mpClient, opcua::NodeId(1, nodeId.toUInt()));
+                std::string type;
+                std::string name(node.readBrowseName().name());
+                std::string value;
+                if (node.readValue().type()->typeKind == UA_DATATYPEKIND_BOOLEAN) {
+                    type = "Bit";
+                    if (node.readValue().to<bool>()) {
+                        value = "1";
+                    } else {
+                        value = "0";
+                    }
+                } else if (node.readValue().type()->typeKind == UA_DATATYPEKIND_BYTE) {
+                    type = "Byte";
+                    value = QString::number(node.readValue().to<uint8_t>()).toStdString();
+                } else if (node.readValue().type()->typeKind == UA_DATATYPEKIND_INT32) {
+                    type = "Int32";
+                    value = QString::number(node.readValue().to<int32_t>()).toStdString();
+                } else if (node.readValue().type()->typeKind == UA_DATATYPEKIND_FLOAT) {
+                    type = "Float";
+                    value = QString::number(node.readValue().to<float>()).toStdString();
+                } else if (node.readValue().type()->typeKind == UA_DATATYPEKIND_DATETIME) {
+                    type = "DataTime";
+                    value = QString::number(node.readValue().to<uint32_t>()).toStdString();
+                } else {
+                    LogErr("Read Unsupported Data Type: {}!", node.readValue().type()->typeKind);
+                }
+                LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", nodeId.toStdString(), name, type, value);
+            }
+        } catch (std::exception &e) {
+            LogErr("{}", e.what());
         }
     }
 }
