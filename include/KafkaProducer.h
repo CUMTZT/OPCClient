@@ -7,7 +7,8 @@
 
 #include <QObject>
 #include <cppkafka/producer.h>
-class KafkaProducer : public QObject {
+#include "MessageConsumer.h"
+class KafkaProducer : public MessageConsumer {
 
     Q_OBJECT
 
@@ -21,9 +22,11 @@ public:
 
     KafkaProducer& operator=(KafkaProducer const&) = delete;
 
+    void loadConfig(const std::string& configFile);
+
 public slots:
 
-    void sendMessage(const QString& message);
+    void onNewMessage(const std::string& dist, const std::string& message) override;
 
 private:
 
@@ -35,8 +38,8 @@ private:
 
     std::shared_ptr<cppkafka::Producer> mpProducer = nullptr;
 
-    std::string mTopic;
-
 };
+
+#define KafkaProducerIns KafkaProducer::getInstance()
 
 #endif //KAFKAPRODUCER_H

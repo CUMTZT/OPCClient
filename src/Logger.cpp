@@ -14,7 +14,15 @@ Logger* Logger::getInstance() {
     return mpInstance;
 }
 
-Logger::Logger() {
+Logger::Logger() {}
+
+Logger::~Logger() {
+    if (nullptr != mpLogger) {
+        mpLogger->flush();
+    }
+}
+
+void Logger::loadConfig(const std::string &configFile) {
     uint32_t logLevel = 2;
     std::string logPath = "./logs";
     uint32_t rotateSize = 100;
@@ -22,16 +30,16 @@ Logger::Logger() {
     try {
         YAML::Node config = YAML::LoadFile("./config/config.yml");
         if (!config.IsNull()) {
-            if (config["Logger"]) {
-                auto loggerNode = config["Logger"];
+            if (config["logger"]) {
+                auto loggerNode = config["logger"];
                 if (loggerNode["level"]) {
                     logLevel = loggerNode["level"].as<uint32_t>();
                 }
-                if (loggerNode["rotateSize"]) {
-                    rotateSize = loggerNode["rotateSize"].as<uint32_t>();
+                if (loggerNode["rotate_size"]) {
+                    rotateSize = loggerNode["rotate_size"].as<uint32_t>();
                 }
-                if (loggerNode["maxFiles"]) {
-                    maxFiles = loggerNode["maxFiles"].as<uint32_t>();
+                if (loggerNode["max_files"]) {
+                    maxFiles = loggerNode["max_files"].as<uint32_t>();
                 }
                 if (loggerNode["path"]) {
                     logPath = loggerNode["path"].as<std::string>();
@@ -40,7 +48,7 @@ Logger::Logger() {
         }
     }
     catch (const std::exception& e) {
-        LogErr("{}",e.what());
+        fmt::println("Logger::loadConfig Error : {}", e.what());
     }
     mpThreadPool = std::make_shared<spdlog::details::thread_pool>(2,2);
     mpFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logPath + "/log.log",1024 * 1024 * rotateSize,maxFiles);
@@ -54,16 +62,17 @@ Logger::Logger() {
     }
 }
 
-Logger::~Logger() {
-    mpLogger->flush();
-}
 
 void Logger::setLevel(spdlog::level::level_enum level) const {
-    mpLogger->set_level(level);
+    if (nullptr != mpLogger) {
+        mpLogger->set_level(level);
+    }
 }
 
 void Logger::log(const std::string &msg, const std::string& file, int line, spdlog::level::level_enum level) const {
-    const std::string content = fmt::format("[{}:{}] : {}",file,line, msg);
-    mpLogger->log(level,content);
-    mpLogger->flush();
+    if (nullptr != mpLogger) {
+        const std::string content = fmt::format("[{}:{}] : {}",file,line, msg);
+        mpLogger->log(level,content);
+        mpLogger->flush();
+    }
 }

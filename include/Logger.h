@@ -23,6 +23,8 @@ public:
 
     ~Logger();
 
+    void loadConfig(const std::string& configFile);
+
     void setLevel(spdlog::level::level_enum level) const;
 
     void log(const std::string& msg, const std::string& file, int line, spdlog::level::level_enum level) const;

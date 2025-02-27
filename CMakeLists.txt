@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
-find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 set(CMAKE_AUTOMOC ON)
 
 find_package(spdlog REQUIRED)
@@ -31,10 +31,14 @@ add_executable(OPCClient
         include/KafkaProducer.h
         src/KafkaProducer.cpp
         include/OPCClientManager.h
-        src/OPCClientManager.cpp)
+        src/OPCClientManager.cpp
+        include/MessageProducer.h
+        include/MessageConsumer.h
+)
 
 target_link_libraries(OPCClient
         Qt6::Core
+        Qt6::Widgets
         spdlog::spdlog
         -lyaml-cpp
         open62541pp::open62541pp

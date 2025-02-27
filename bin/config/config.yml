@@ -1,19 +1,24 @@
-OPCClients:
-  -
-    name: 1-4
-    server: opc.tcp://localhost:4840
-    interval: 1000
-    nodes: ["the.answer","the.answer1"]
-
-Logger:
+logger:
   path: ./logs
-  rotateSize: 100 #MB
-  maxFiles: 100
+  rotate_size: 100 #MB
+  max_files: 100
   level: 1 #0:trace,1:debug,2:info,3:warn,4:error,5:critical,6:off
 
-KafkaProducer:
+kafka_producer:
   brokers: 47.94.215.223:9092
-  topic: DATA_ACQUISITION_REALTIME
+
+opc:
+  station_id: 1
+  station_name: 邹庄煤矿
+  interval: 1000
+  max_thread_count: 6
+  clients:
+    -
+      id: 1
+      name: 1-4号机组
+      server: opc.tcp://localhost:4840
+      dist: DATA_ACQUISITION_REALTIME
+      nodes: [[1,1000],[1,1001]]
 
 
 

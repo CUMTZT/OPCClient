@@ -5,35 +5,56 @@
 #ifndef OPCCLIENTMANAGER_H
 #define OPCCLIENTMANAGER_H
 #include <QMap>
-#include <QObject>
+#include <QThreadPool>
+#include <QThread>
+#include <QTimer>
+#include "MessageConsumer.h"
+#include "MessageProducer.h"
 #include "OPCClient.h"
-class OPCClientManager : public QObject {
+#include <map>
 
+class OPCClientManager : public MessageProducer {
     Q_OBJECT
 
 public:
-    static OPCClientManager* getInstance();
+    static OPCClientManager *getInstance();
 
-    OPCClientManager(OPCClientManager const&) = delete;
+    OPCClientManager(OPCClientManager const &) = delete;
 
-    OPCClientManager(OPCClientManager&&) = delete;
+    OPCClientManager(OPCClientManager &&) = delete;
 
-    OPCClientManager& operator=(OPCClientManager const&) = delete;
+    OPCClientManager &operator=(OPCClientManager const &) = delete;
 
     ~OPCClientManager() override;
 
-private:
+    void loadConfig(const std::string &configFile);
 
+private slots:
+    void onClientNewMessage(const std::vector<OPCData>& message);
+
+    void onTimerTimeout();
+
+private:
     OPCClientManager();
 
-    static OPCClientManager* mpInstance;
+    static OPCClientManager *mpInstance;
 
     static std::mutex mMutex;
 
-    QMap<QString,OPCClient*> mClientMap;
+    QTimer* mpTimer = nullptr;
+
+    std::map<std::string,OPCClient*>mClientMap;
 
     std::recursive_mutex mClientMapMutex;
 
     YAML::Node mConfig;
+
+    QThreadPool *mpThreadPool = nullptr;
+
+    int mStationId;
+
+    std::string mStationName;
 };
+
+#define OPCClientManagerIns OPCClientManager::getInstance()
 #endif //OPCCLIENTMANAGER_H

@@ -17,30 +17,28 @@ KafkaProducer* KafkaProducer::getInstance() {
     return mpInstance;
 }
 
-KafkaProducer::KafkaProducer(QObject *parent) : QObject(parent) {
+KafkaProducer::KafkaProducer(QObject *parent) : MessageConsumer(parent) {}
+
+void KafkaProducer::loadConfig(const std::string& configFile) {
     cppkafka::Configuration config;
     YAML::Node configNode = YAML::LoadFile("./config/config.yml");
     if (!configNode.IsNull()) {
-        if (configNode["KafkaProducer"]) {
-            auto kafkaNode = configNode["KafkaProducer"];
+        if (configNode["kafka_producer"]) {
+            auto kafkaNode = configNode["kafka_producer"];
             if (kafkaNode["brokers"]){
                 auto brokers = kafkaNode["brokers"].as<std::string>();
                 config.set("metadata.broker.list", brokers);
                 mpProducer = std::make_shared<cppkafka::Producer>(config);
-            };
-            if (kafkaNode["topic"]) {
-                mTopic = kafkaNode["topic"].as<std::string>();
             }
         }
     }
 }
 
-void KafkaProducer::sendMessage(const QString& message) {
-    if (nullptr == mpProducer || mTopic.empty()) {
+void KafkaProducer::onNewMessage(const std::string& dist, const std::string& message) {
+    if (nullptr == mpProducer || dist.empty() || message.empty()) {
         return;
     }
-
-    cppkafka::MessageBuilder builder(mTopic);
-    builder.payload({message.toStdString().c_str(), message.toStdString().size()});
+    cppkafka::MessageBuilder builder(dist);
+    builder.payload({message.c_str(), message.size()});
     mpProducer->produce(builder);
 }

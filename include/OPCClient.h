@@ -8,50 +8,66 @@
 #include <open62541pp/open62541pp.hpp>
 #include <cstdio>
 #include <mutex>
-#include <QTimer>
-#include <QStringList>
-#include <QThread>
+#include <QObject>
 #include <yaml-cpp/node/convert.h>
+#include <QRunnable>
 
-class OPCClient : public QObject{
+struct OPCData {
+    std::string name;
+    std::string value;
+    int type;
+    int id;
+    int namespaceIndex;
+};
 
+class OPCClient : public QObject, public QRunnable {
     Q_OBJECT
 
 public:
+    explicit OPCClient(QObject *parent = nullptr);
 
-    explicit OPCClient(QObject* parent = nullptr);
+    ~OPCClient() override;
 
-    ~OPCClient()override;
+    void setID(int id);
 
-    void setUrl(const QString& url);
+    int getID();
 
-    QString getURL();
+    void setName(const std::string& name);
 
-    void setInterval(int interval);
+    std::string getName();
 
-    int getInterval();
+    void setUrl(const std::string &url);
 
-    void setNodeIds(const QStringList& nodeIds);
+    std::string getURL();
 
-    QStringList getNodeIds();
+    void addNode(const std::pair<int,int> &nodeIds);
 
-private slots:
+    std::set<std::pair<int,int>> getNodes();
 
-    void onTimerTimeout();
+    void setDist(const std::string& dist);
+
+    std::string getDist();
+
+signals:
+    void newMessage(const std::vector<OPCData> &message);
 
 private:
+    void connectServer();
 
-    QTimer* mpTimer = nullptr;
+    void run() override;
 
-    QString mUrl;
+    std::string mUrl;
+
+    std::string mName;
+
+    int mID;
+
+    std::string mDestination;
 
     opcua::Client *mpClient = nullptr;
 
     std::recursive_mutex mClientLocker;
 
-    QStringList mNodeIds;
-
-    QThread* mpThread = nullptr;
-
+    std::set<std::pair<int,int>> mNodes;
 };
 #endif //OPCCLIENT_OPCCLIENT_H

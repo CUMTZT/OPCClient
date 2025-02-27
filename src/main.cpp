@@ -3,12 +3,17 @@
 
 
 #include <QCoreApplication>
-#include "OPCClient.h"
+#include "KafkaProducer.h"
+#include "Logger.h"
+#include "OPCClientManager.h"
+#include <yaml-cpp/yaml.h>
 
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
-    OPCClient client;
-    client.setUrl("opc.tcp://localhost:4840");
-    client.setNodeIds({"1000"});
+    std::string configFile = "./config/config.yml";
+    LoggerIns->loadConfig(configFile);
+    OPCClientManagerIns->loadConfig(configFile);
+    KafkaProducerIns->loadConfig(configFile);
+    QObject::connect(OPCClientManagerIns,&OPCClientManager::newMessage,KafkaProducerIns,&KafkaProducer::onNewMessage);
     return a.exec();
 }
