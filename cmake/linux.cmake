@@ -1,21 +1,19 @@
-set(CMAKE_PREFIX_PATH  "${OPC_CLIENT_RUNTIME_DIR}/linux/x86_64/lib/cmake")
+set(CMAKE_PREFIX_PATH  "${OPC_CLIENT_RUNTIME_DIR}/linux/x86_64/Qt/6.8.2/gcc_64/lib/cmake")
+set(DEPENDENCY_PATH "${OPC_CLIENT_RUNTIME_DIR}/linux/x86_64/")
 
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC ON)
 
 find_package(spdlog REQUIRED)
 
-find_package(yaml-cpp REQUIRED)
-
-find_package(open62541 REQUIRED)
-
-find_package(open62541pp REQUIRED)
-
-find_package(CppKafka REQUIRED)
-
 include_directories(
         ${PROJECT_SOURCE_DIR}/include
+        ${DEPENDENCY_PATH}/include
+)
+
+link_directories(
+        ${DEPENDENCY_PATH}/lib
 )
 
 add_executable(OPCClient
@@ -34,11 +32,11 @@ add_executable(OPCClient
 
 target_link_libraries(OPCClient
         Qt6::Core
-        Qt6::Widgets
         spdlog::spdlog
         -lyaml-cpp
-        open62541pp::open62541pp
-        open62541::open62541
+        -lopen62541pp
+        -lopen62541
         -lcppkafka
-        -lrdkafka)
+        -lrdkafka
+        )
 

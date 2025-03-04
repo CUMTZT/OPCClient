@@ -50,9 +50,9 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
         }
 
         if (mConfig["station_name"]) {
-            mStationName = mConfig["stationName"].as<std::string>();
+            mStationName = mConfig["station_name"].as<std::string>();
         } else {
-            LogWarn("配置文件中不存在stationName！");
+            LogWarn("配置文件中不存在station_name！");
             return;
         }
 
@@ -111,8 +111,9 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                 client->addNode(nodePair);
                 client->setName(name);
                 client->setID(id);
+                client->setAutoDelete(false);
                 connect(client, &OPCClient::newMessage, this, &OPCClientManager::onClientNewMessage);
-                mClientMap.emplace();
+                mClientMap.emplace(QString::number(id).toStdString(), client);
             }
         } else {
             LogWarn("配置文件中不存在OPC客户端配置！");

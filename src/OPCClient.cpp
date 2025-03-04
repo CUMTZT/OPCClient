@@ -108,12 +108,12 @@ void OPCClient::run() {
                     } else {
                         data.value = "0";
                     }
-                } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BYTE) {
+                } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_INT32) {
+                    data.type = UA_DATATYPEKIND_INT32;
+                    data.value = QString::number(uaNode.readValue().to<int32_t>()).toStdString();
+                }else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BYTE) {
                     data.type = UA_DATATYPEKIND_BYTE;
                     data.value = QString::number(uaNode.readValue().to<uint8_t>()).toStdString();
-                } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BYTE) {
-                    data.type = UA_DATATYPEKIND_BYTE;
-                    data.value = QString::number(uaNode.readValue().to<int32_t>()).toStdString();
                 } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_FLOAT) {
                     data.type = UA_DATATYPEKIND_FLOAT;
                     data.value = QString::number(uaNode.readValue().to<float>()).toStdString();
@@ -122,6 +122,7 @@ void OPCClient::run() {
                     data.value = QString::number(uaNode.readValue().to<uint32_t>()).toStdString();
                 } else {
                     LogErr("Read Unsupported Data Type: {}!", uaNode.readValue().type()->typeKind);
+                    continue;
                 }
                 LogInfo("Successful Read Data,ID:[{},{}] Name:{} Type:{} Value:{}", node.first,node.second, data.name, data.type, data.value);
                 message.emplace_back(data);

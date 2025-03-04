@@ -18,7 +18,7 @@ opc:
       name: 1-4号机组
       server: opc.tcp://localhost:4840
       dist: DATA_ACQUISITION_REALTIME
-      nodes: [[1,1000],[1,1001]]
+      nodes: [[1,1000]]
 
 
 
