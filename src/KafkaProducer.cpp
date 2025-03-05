@@ -3,7 +3,7 @@
 //
 #include "KafkaProducer.h"
 #include <yaml-cpp/yaml.h>
-#include <rapidjson/prettywriter.h>
+#include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>
 #include "Logger.h"
 #include <QDateTime>
@@ -42,7 +42,7 @@ void KafkaProducer::onNewDatas(const std::string& dist,const std::string& source
     std::string message;
     try {
         rapidjson::StringBuffer buf;
-        rapidjson::PrettyWriter writer(buf);
+        rapidjson::Writer writer(buf);
         writer.StartArray();
         writer.StartObject();
         writer.Key("code");

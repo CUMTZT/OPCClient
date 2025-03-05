@@ -85,7 +85,6 @@ void OPCClient::connectServer() {
             return;
         }
         mpClient = new opcua::Client();
-            123421
         mpClient->connect(mUrl);
     } catch (const std::exception &e) {
         LogErr("{}", e.what());
