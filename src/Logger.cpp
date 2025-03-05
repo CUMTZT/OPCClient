@@ -1,4 +1,6 @@
 #include "Logger.h"
+
+#include <qthread.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <yaml-cpp/yaml.h>
 
@@ -28,7 +30,7 @@ void Logger::loadConfig(const std::string &configFile) {
     uint32_t rotateSize = 100;
     uint32_t maxFiles = 100;
     try {
-        YAML::Node config = YAML::LoadFile("./config/config.yml");
+        YAML::Node config = YAML::LoadFile(configFile);
         if (!config.IsNull()) {
             if (config["logger"]) {
                 auto loggerNode = config["logger"];

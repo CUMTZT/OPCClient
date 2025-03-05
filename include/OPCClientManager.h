@@ -8,12 +8,11 @@
 #include <QThreadPool>
 #include <QThread>
 #include <QTimer>
-#include "MessageConsumer.h"
-#include "MessageProducer.h"
 #include "OPCClient.h"
+#include "KafkaProducer.h"
 #include <map>
 
-class OPCClientManager : public MessageProducer {
+class OPCClientManager : public QObject {
     Q_OBJECT
 
 public:
@@ -29,10 +28,9 @@ public:
 
     void loadConfig(const std::string &configFile);
 
-private slots:
-    void onClientNewMessage(const std::vector<OPCData>& message);
+//private slots:
 
-    void onTimerTimeout();
+    //void onTimerTimeout();
 
 private:
     OPCClientManager();
@@ -43,17 +41,15 @@ private:
 
     QTimer* mpTimer = nullptr;
 
-    std::map<std::string,OPCClient*>mClientMap;
+    std::vector<OPCClient*>mClients;
 
-    std::recursive_mutex mClientMapMutex;
+    std::recursive_mutex mClientsMutex;
+
+    KafkaProducer* mpKafkaProducer = nullptr;
+
+    QThread* mpKafkaProducerThread = nullptr;
 
     YAML::Node mConfig;
-
-    QThreadPool *mpThreadPool = nullptr;
-
-    int mStationId;
-
-    std::string mStationName;
 };
 
 #define OPCClientManagerIns OPCClientManager::getInstance()

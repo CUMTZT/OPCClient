@@ -7,18 +7,16 @@ logger:
 kafka_producer:
   brokers: 47.94.215.223:9092
 
+station_code: zouzhuang-station
+
 opc:
-  station_id: 1
-  station_name: 邹庄煤矿
   interval: 1000
-  max_thread_count: 6
   clients:
     -
-      id: 1
-      name: 1-4号机组
+      code: no1-machine
       server: opc.tcp://localhost:4840
       dist: DATA_ACQUISITION_REALTIME
-      nodes: [[1,1000]]
+      nodes_config: ./config/no1_machine_nodes.yml
 
 
 

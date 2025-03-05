@@ -7,39 +7,24 @@
 
 #include <QObject>
 #include <cppkafka/producer.h>
-#include "MessageConsumer.h"
-class KafkaProducer : public MessageConsumer {
-
+class KafkaProducer : public QObject {
     Q_OBJECT
 
 public:
-
-    static KafkaProducer* getInstance();
-
-    KafkaProducer(KafkaProducer const&) = delete;
-
-    KafkaProducer(KafkaProducer&&) = delete;
-
-    KafkaProducer& operator=(KafkaProducer const&) = delete;
+    explicit KafkaProducer(QObject *parent = nullptr);
 
     void loadConfig(const std::string& configFile);
 
 public slots:
 
-    void onNewMessage(const std::string& dist, const std::string& message) override;
+    void onNewDatas(const std::string& dist, const std::string& source, const std::vector<std::pair<std::string, std::string>>& datas);
 
 private:
 
-    explicit KafkaProducer(QObject *parent = nullptr);
-
-    static KafkaProducer* mpInstance;
-
-    static std::mutex mMutex;
-
     std::shared_ptr<cppkafka::Producer> mpProducer = nullptr;
 
-};
+    std::string mStationCode;
 
-#define KafkaProducerIns KafkaProducer::getInstance()
+};
 
 #endif //KAFKAPRODUCER_H

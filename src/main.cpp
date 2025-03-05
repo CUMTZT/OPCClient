@@ -12,8 +12,7 @@ int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
     std::string configFile = "./config/config.yml";
     LoggerIns->loadConfig(configFile);
+    QThread::currentThreadId();
     OPCClientManagerIns->loadConfig(configFile);
-    KafkaProducerIns->loadConfig(configFile);
-    QObject::connect(OPCClientManagerIns,&OPCClientManager::newMessage,KafkaProducerIns,&KafkaProducer::onNewMessage);
     return a.exec();
 }

@@ -8,19 +8,11 @@
 #include <open62541pp/open62541pp.hpp>
 #include <cstdio>
 #include <mutex>
-#include <QObject>
+#include <QThread>
 #include <yaml-cpp/node/convert.h>
 #include <QRunnable>
 
-struct OPCData {
-    std::string name;
-    std::string value;
-    int type;
-    int id;
-    int namespaceIndex;
-};
-
-class OPCClient : public QObject, public QRunnable {
+class OPCClient : public QThread {
     Q_OBJECT
 
 public:
@@ -28,39 +20,37 @@ public:
 
     ~OPCClient() override;
 
-    void setID(int id);
+    void setCode(const std::string& code);
 
-    int getID();
-
-    void setName(const std::string& name);
-
-    std::string getName();
+    std::string getCode();
 
     void setUrl(const std::string &url);
 
     std::string getURL();
 
-    void addNode(const std::pair<int,int> &nodeIds);
+    void addNode(const std::string &node);
 
-    std::set<std::pair<int,int>> getNodes();
+    std::set<std::string> getNodes();
 
     void setDist(const std::string& dist);
 
     std::string getDist();
 
+    void start();
+
+    void stop();
+
 signals:
-    void newMessage(const std::vector<OPCData> &message);
+    void newData(const std::string& dist,const std::string& source, const std::vector<std::pair<std::string, std::string>>& datas);
 
 private:
-    void connectServer();
-
     void run() override;
+
+    void connectServer();
 
     std::string mUrl;
 
-    std::string mName;
-
-    int mID;
+    std::string mCode;
 
     std::string mDestination;
 
@@ -68,6 +58,8 @@ private:
 
     std::recursive_mutex mClientLocker;
 
-    std::set<std::pair<int,int>> mNodes;
+    std::set<std::string> mNodes;
+
+    std::atomic<bool> mRunning = false;
 };
 #endif //OPCCLIENT_OPCCLIENT_H
