@@ -12,7 +12,7 @@ OPCClientManager *OPCClientManager::mpInstance = nullptr;
 std::mutex OPCClientManager::mMutex;
 
 OPCClientManager *OPCClientManager::getInstance() {
-    if (mpInstance == nullptr) {
+    if (nullptr == mpInstance) {
         std::scoped_lock lock(mMutex);
         if (nullptr == mpInstance) {
             mpInstance = new OPCClientManager();
@@ -26,15 +26,12 @@ OPCClientManager::OPCClientManager() : QObject(nullptr) {
     mpKafkaProducerThread = new QThread(this);
     mpKafkaProducer->moveToThread(mpKafkaProducerThread);
     mpKafkaProducerThread->start();
-    //mpTimer = new QTimer(this);
-    //mpTimer->setInterval(1000);
-    //mpTimer->setTimerType(Qt::VeryCoarseTimer);
-    //connect(mpTimer, &QTimer::timeout, this, &OPCClientManager::onTimerTimeout);
-    //mpTimer->start();
 }
 
 OPCClientManager::~OPCClientManager() {
-    mpTimer->stop();
+    for (auto& client : mClients){
+        client->stop();
+    }
 }
 
 void OPCClientManager::loadConfig(const std::string &configFile) {

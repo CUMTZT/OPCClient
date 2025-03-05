@@ -4,6 +4,10 @@ set(DEPENDENCY_PATH "${OPC_CLIENT_RUNTIME_DIR}/macos")
 find_package(Qt6 REQUIRED COMPONENTS Core)
 set(CMAKE_AUTOMOC ON)
 
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
+
 find_package(spdlog REQUIRED)
 
 find_package(yaml-cpp REQUIRED)
@@ -18,7 +22,9 @@ include_directories(
 link_directories(
         ${DEPENDENCY_PATH}/lib
 )
+
 message("${DEPENDENCY_PATH}/lib")
+
 add_executable(OPCClient
         include/OPCClient.h
         src/main.cpp
@@ -29,8 +35,8 @@ add_executable(OPCClient
         src/KafkaProducer.cpp
         include/OPCClientManager.h
         src/OPCClientManager.cpp
-        include/MessageProducer.h
-        include/MessageConsumer.h
+        ../include/Exception.h
+        ../src/Exception.cpp
 )
 
 target_link_libraries(OPCClient

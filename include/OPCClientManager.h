@@ -28,18 +28,12 @@ public:
 
     void loadConfig(const std::string &configFile);
 
-//private slots:
-
-    //void onTimerTimeout();
-
 private:
     OPCClientManager();
 
     static OPCClientManager *mpInstance;
 
     static std::mutex mMutex;
-
-    QTimer* mpTimer = nullptr;
 
     std::vector<OPCClient*>mClients;
 

@@ -68,7 +68,7 @@ void OPCClient::start() {
 
 void OPCClient::stop() {
     mRunning = false;
-    QThread::wait();
+    wait();
 }
 
 void OPCClient::connectServer() {
@@ -111,8 +111,8 @@ void OPCClient::run() {
                     }
                     std::string first = node.substr(0, index);
                     std::string second = node.substr(index + 1);
-                    opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), second));
-                    data.first = uaNode.readBrowseName().name();
+                    opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
+                    data.first = node;
                     if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BOOLEAN) {
                         type = "bool";
                         if (uaNode.readValue().to<bool>()) {
@@ -132,19 +132,23 @@ void OPCClient::run() {
                     } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_DATETIME) {
                         type = "datetime";
                         data.second = QString::number(uaNode.readValue().to<uint32_t>()).toStdString();
-                    } else {
+                    }else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_STRING) {
+                        type = "string";
+                        data.second = uaNode.readValue().to<std::string>();
+                    }else {
                         LogErr("Read Unsupported Data Type: {}!", uaNode.readValue().type()->typeKind);
                         continue;
                     }
-                    LogInfo("Successful Read Data,ID:[{},{}] Name:{} Type:{} Value:{}", first,second, data.first, type, data.second);
-                    qDebug() << QThread::currentThreadId();
+                    LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", node, data.first, type, data.second);
                     datas.emplace_back(data);
                 }
-                emit newData(mDestination,mCode, datas);
+                if (!datas.empty()){
+                    emit newData(mDestination,mCode, datas);
+                }
             } catch (std::exception &e) {
                 LogErr("{}", e.what());
             }
         }
-        QThread::sleep(1);
+        sleep(1);
     }
 }

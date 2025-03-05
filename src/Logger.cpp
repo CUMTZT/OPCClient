@@ -1,8 +1,8 @@
 #include "Logger.h"
-
-#include <qthread.h>
+#include <QThread>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <yaml-cpp/yaml.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 Logger* Logger::mpInstance = nullptr;
 std::mutex Logger::mMutex;
@@ -16,7 +16,7 @@ Logger* Logger::getInstance() {
     return mpInstance;
 }
 
-Logger::Logger() {}
+Logger::Logger() = default;
 
 Logger::~Logger() {
     if (nullptr != mpLogger) {
@@ -52,13 +52,12 @@ void Logger::loadConfig(const std::string &configFile) {
     catch (const std::exception& e) {
         fmt::println("Logger::loadConfig Error : {}", e.what());
     }
-    mpThreadPool = std::make_shared<spdlog::details::thread_pool>(2,2);
     mpFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logPath + "/log.log",1024 * 1024 * rotateSize,maxFiles);
     mpFileSink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] %v");
     mpConsoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     mpConsoleSink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] %v");
     std::vector sinks {mpFileSink, mpConsoleSink};
-    mpLogger = std::make_shared<spdlog::async_logger>("Logger", sinks.begin(), sinks.end(),mpThreadPool,spdlog::async_overflow_policy::block);
+    mpLogger = std::make_shared<spdlog::logger>("Logger", sinks.begin(), sinks.end());
     if (logLevel > 0 && logLevel < spdlog::level::n_levels) {
         mpLogger->set_level(static_cast<spdlog::level::level_enum>(logLevel));
     }

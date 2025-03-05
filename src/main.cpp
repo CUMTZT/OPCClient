@@ -8,11 +8,17 @@
 #include "OPCClientManager.h"
 #include <yaml-cpp/yaml.h>
 
+void cleanup(){
+    delete LoggerIns;
+    delete OPCClientManagerIns;
+}
+
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
     std::string configFile = "./config/config.yml";
     LoggerIns->loadConfig(configFile);
     QThread::currentThreadId();
     OPCClientManagerIns->loadConfig(configFile);
+    std::atexit(cleanup);
     return a.exec();
 }

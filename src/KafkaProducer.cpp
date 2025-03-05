@@ -34,8 +34,22 @@ void KafkaProducer::loadConfig(const std::string& configFile) {
 }
 
 void KafkaProducer::onNewDatas(const std::string& dist,const std::string& source, const std::vector<std::pair<std::string, std::string>>& datas) {
-    if (nullptr == mpProducer || dist.empty() || source.empty() || datas.empty()) {
-        LogWarn("{}","TODO");//TODO
+    if (nullptr == mpProducer) {
+        LogWarn("{}","Kafka生产者为nullptr！");//TODO
+        return;
+    }
+    if (dist.empty()){
+        LogWarn("{}","发送Topic为空！");//TODO
+        return;
+    }
+    if(source.empty())
+    {
+        LogWarn("{}","电站code为空！");//TODO
+        return;
+    }
+    if (datas.empty())
+    {
+        LogWarn("{}","数据为空！");//TODO
         return;
     }
     cppkafka::MessageBuilder builder(dist);
@@ -46,7 +60,7 @@ void KafkaProducer::onNewDatas(const std::string& dist,const std::string& source
         writer.StartArray();
         writer.StartObject();
         writer.Key("code");
-        writer.String((mStationCode+"_"+source).c_str());
+        writer.String((mStationCode+":"+source).c_str());
         auto collectTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz").toStdString();
         writer.Key("collectTime");
         writer.String(collectTime.c_str());
@@ -64,11 +78,11 @@ void KafkaProducer::onNewDatas(const std::string& dist,const std::string& source
         message = buf.GetString();
     }
     catch (std::exception& e) {
-        LogErr("Generate message error : {}",e.what());
+        LogErr("json数据序列化失败！: {}",e.what());
         return;
     }
     if (message.empty()) {
-        LogWarn("Message is empty!");
+        LogWarn("json数据为空！");
         return;
     }
     builder.payload({message.c_str(), message.size()});

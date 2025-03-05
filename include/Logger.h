@@ -5,10 +5,7 @@
 #ifndef OPCCLIENT_LOGGER_H
 #define OPCCLIENT_LOGGER_H
 
-#include <spdlog/async_logger.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <QString>
-#include <spdlog/async.h>
+#include <spdlog/spdlog.h>
 class Logger{
 
 public:
@@ -41,9 +38,7 @@ private:
 
     spdlog::sink_ptr mpConsoleSink = nullptr;
 
-    spdlog::details::async_logger_ptr mpLogger = nullptr;
-
-    std::shared_ptr<spdlog::details::thread_pool> mpThreadPool = nullptr;
+    std::shared_ptr<spdlog::logger> mpLogger = nullptr;
 
 };
 
