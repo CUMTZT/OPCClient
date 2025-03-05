@@ -1,22 +1,24 @@
-set(CMAKE_PREFIX_PATH  ${PROJECT_SOURCE_DIR}/bin)
+set(CMAKE_PREFIX_PATH  "/Users/zhangteng/Desktop/zhangteng/Workspace/runtime/macos/Qt/6.8.2/macos/lib/cmake")
+set(DEPENDENCY_PATH "${OPC_CLIENT_RUNTIME_DIR}/macos")
 
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 set(CMAKE_AUTOMOC ON)
 
 find_package(spdlog REQUIRED)
 
 find_package(yaml-cpp REQUIRED)
 
-find_package(open62541 REQUIRED)
-
-find_package(open62541pp REQUIRED)
-
 find_package(CppKafka REQUIRED)
 
 include_directories(
         ${PROJECT_SOURCE_DIR}/include
+        ${DEPENDENCY_PATH}/include
 )
 
+link_directories(
+        ${DEPENDENCY_PATH}/lib
+)
+message("${DEPENDENCY_PATH}/lib")
 add_executable(OPCClient
         include/OPCClient.h
         src/main.cpp
@@ -33,11 +35,10 @@ add_executable(OPCClient
 
 target_link_libraries(OPCClient
         Qt6::Core
-        Qt6::Widgets
         spdlog::spdlog
-        -lyaml-cpp
-        open62541pp::open62541pp
-        open62541::open62541
+        yaml-cpp::yaml-cpp
+        -lopen62541pp
+        -lopen62541
         -lcppkafka
         -lrdkafka)
 

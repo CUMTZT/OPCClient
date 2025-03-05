@@ -92,6 +92,11 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                     continue;
                 }
                 std::string server = clientConfig["server"].as<std::string>();
+                if (!clientConfig["dist"]) {
+                    LogErr("配置文件中不存在OPC服务端URL！");
+                    continue;
+                }
+                std::string dist = clientConfig["dist"].as<std::string>();
                 std::pair<int, int> nodePair;
                 if (clientConfig["nodes"]) {
                     for (auto node: clientConfig["nodes"]) {
@@ -111,6 +116,7 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                 client->addNode(nodePair);
                 client->setName(name);
                 client->setID(id);
+                client->setDist(dist);
                 client->setAutoDelete(false);
                 connect(client, &OPCClient::newMessage, this, &OPCClientManager::onClientNewMessage);
                 mClientMap.emplace(QString::number(id).toStdString(), client);
