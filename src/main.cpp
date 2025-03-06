@@ -7,6 +7,7 @@
 #include "Logger.h"
 #include "OPCClientManager.h"
 #include <yaml-cpp/yaml.h>
+#include "QDir"
 
 void cleanup(){
     delete LoggerIns;
@@ -16,6 +17,7 @@ void cleanup(){
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
     std::string configFile = "./config/config.yml";
+    QString dir = QDir::currentPath();
     LoggerIns->loadConfig(configFile);
     QThread::currentThreadId();
     OPCClientManagerIns->loadConfig(configFile);

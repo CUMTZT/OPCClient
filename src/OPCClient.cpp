@@ -112,6 +112,7 @@ void OPCClient::run() {
                     std::string first = node.substr(0, index);
                     std::string second = node.substr(index + 1);
                     opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
+                    std::string name = std::string(uaNode.readBrowseName().name());
                     data.first = node;
                     if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BOOLEAN) {
                         type = "bool";
@@ -139,7 +140,7 @@ void OPCClient::run() {
                         LogErr("Read Unsupported Data Type: {}!", uaNode.readValue().type()->typeKind);
                         continue;
                     }
-                    LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", node, data.first, type, data.second);
+                    LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", node, name, type, data.second);
                     datas.emplace_back(data);
                 }
                 if (!datas.empty()){
