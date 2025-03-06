@@ -35,21 +35,21 @@ void KafkaProducer::loadConfig(const std::string& configFile) {
 
 void KafkaProducer::onNewDatas(const std::string& dist,const std::string& source, const std::vector<std::pair<std::string, std::string>>& datas) {
     if (nullptr == mpProducer) {
-        LogWarn("{}","Kafka生产者为nullptr！");//TODO
+        LogWarn("{}","Kafka生产者为nullptr！");
         return;
     }
     if (dist.empty()){
-        LogWarn("{}","发送Topic为空！");//TODO
+        LogWarn("{}","发送Topic为空！");
         return;
     }
     if(source.empty())
     {
-        LogWarn("{}","电站code为空！");//TODO
+        LogWarn("{}","电站code为空！");
         return;
     }
     if (datas.empty())
     {
-        LogWarn("{}","数据为空！");//TODO
+        LogWarn("{}","数据为空！");
         return;
     }
     cppkafka::MessageBuilder builder(dist);
