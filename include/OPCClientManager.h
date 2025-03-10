@@ -11,12 +11,12 @@
 #include "OPCClient.h"
 #include "KafkaProducer.h"
 #include <map>
-
+#include "AscendingMessageHandler.h"
 class OPCClientManager : public QObject {
     Q_OBJECT
 
 public:
-    static OPCClientManager *getInstance();
+    static OPCClientManager& getInstance();
 
     OPCClientManager(OPCClientManager const &) = delete;
 
@@ -28,14 +28,12 @@ public:
 
     void loadConfig(const std::string &configFile);
 
+    void onSetDataValue(const std::string& code, const Data& data);
+
 private:
     OPCClientManager();
 
-    static OPCClientManager *mpInstance;
-
-    static std::mutex mMutex;
-
-    std::vector<OPCClient*>mClients;
+    std::unordered_map<std::string,OPCClient*>mClients;
 
     std::recursive_mutex mClientsMutex;
 
@@ -44,6 +42,8 @@ private:
     QThread* mpKafkaProducerThread = nullptr;
 
     YAML::Node mConfig;
+
+    AscendingMessageHandler* mpAscendingMessageHandler = nullptr;
 };
 
 #define OPCClientManagerIns OPCClientManager::getInstance()

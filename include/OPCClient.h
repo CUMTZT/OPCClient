@@ -6,11 +6,12 @@
 #define OPCCLIENT_OPCCLIENT_H
 
 #include <open62541pp/open62541pp.hpp>
-#include <cstdio>
+#include "GlobalDefine.h"
 #include <mutex>
 #include <QThread>
 #include <yaml-cpp/node/convert.h>
 #include <QRunnable>
+#include "GlobalDefine.h"
 
 class OPCClient : public QThread {
     Q_OBJECT
@@ -30,18 +31,24 @@ public:
 
     void addNode(const std::string &node);
 
-    std::set<std::string> getNodes();
+    std::set<std::string> nodes();
 
-    void setDist(const std::string& dist);
+    void setTopic(const std::string& topic);
 
-    std::string getDist();
+    std::string topic();
+
+    void setInterval(int interval);
+
+    int interval();
 
     void start();
 
     void stop();
 
+    void setDataValue(const Data& data);
+
 signals:
-    void newData(const std::string& dist,const std::string& source, const std::vector<std::pair<std::string, std::string>>& datas);
+    void newData(const std::string& topic,const std::string& code, const DataList& datas);
 
 private:
     void run() override;
@@ -52,7 +59,9 @@ private:
 
     std::string mCode;
 
-    std::string mDestination;
+    std::string mTopic;
+
+    std::atomic<int> mInterval;
 
     opcua::Client *mpClient = nullptr;
 

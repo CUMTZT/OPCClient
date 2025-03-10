@@ -9,18 +9,11 @@
 #include <yaml-cpp/yaml.h>
 #include "QDir"
 
-void cleanup(){
-    delete LoggerIns;
-    delete OPCClientManagerIns;
-}
-
 int main(int argc, char *argv[]) {
     QCoreApplication a(argc,argv);
     std::string configFile = "./config/config.yml";
-    QString dir = QDir::currentPath();
-    LoggerIns->loadConfig(configFile);
+    LoggerIns.loadConfig(configFile);
     QThread::currentThreadId();
-    OPCClientManagerIns->loadConfig(configFile);
-    std::atexit(cleanup);
+    OPCClientManagerIns.loadConfig(configFile);
     return a.exec();
 }

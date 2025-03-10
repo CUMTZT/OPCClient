@@ -4,16 +4,9 @@
 #include <yaml-cpp/yaml.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-Logger* Logger::mpInstance = nullptr;
-std::mutex Logger::mMutex;
-Logger* Logger::getInstance() {
-    if (mpInstance == nullptr) {
-        std::scoped_lock lock(mMutex);
-        if (nullptr == mpInstance) {
-            mpInstance = new Logger();
-        }
-    }
-    return mpInstance;
+Logger& Logger::getInstance() {
+    static Logger instance;
+    return instance;
 }
 
 Logger::Logger() = default;

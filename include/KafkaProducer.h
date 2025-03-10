@@ -7,6 +7,7 @@
 
 #include <QObject>
 #include <cppkafka/producer.h>
+#include "GlobalDefine.h"
 class KafkaProducer : public QObject {
     Q_OBJECT
 
@@ -17,7 +18,7 @@ public:
 
 public slots:
 
-    void onNewDatas(const std::string& dist, const std::string& source, const std::vector<std::pair<std::string, std::string>>& datas);
+    void onNewDatas(const std::string& topic, const std::string& code, const DataList& datas);
 
 private:
 

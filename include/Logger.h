@@ -10,7 +10,7 @@ class Logger{
 
 public:
 
-    static Logger* getInstance();
+    static Logger& getInstance();
 
     Logger(Logger const&) = delete;
 
@@ -30,10 +30,6 @@ private:
 
     Logger();
 
-    static Logger* mpInstance;
-
-    static std::mutex mMutex;
-
     spdlog::sink_ptr mpFileSink = nullptr;
 
     spdlog::sink_ptr mpConsoleSink = nullptr;
@@ -43,11 +39,11 @@ private:
 };
 
 #define LoggerIns Logger::getInstance()
-#define LogTrace(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__,spdlog::level::trace)
-#define LogDebug(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::debug)
-#define LogInfo(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::info)
-#define LogWarn(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::warn)
-#define LogErr(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::err)
-#define LogCritical(...) LoggerIns->log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::critical)
+#define LogTrace(...) LoggerIns.log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__,spdlog::level::trace)
+#define LogDebug(...) LoggerIns.log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::debug)
+#define LogInfo(...) LoggerIns.log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::info)
+#define LogWarn(...) LoggerIns.log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::warn)
+#define LogErr(...) LoggerIns.log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::err)
+#define LogCritical(...) LoggerIns.log(fmt::format(__VA_ARGS__), __FILE_NAME__, __LINE__, spdlog::level::critical)
 
 #endif //OPCCLIENT_LOGGER_H

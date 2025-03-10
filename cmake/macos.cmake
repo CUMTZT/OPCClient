@@ -37,6 +37,9 @@ add_executable(OPCClient
         src/OPCClientManager.cpp
         ../include/Exception.h
         ../src/Exception.cpp
+        ../include/AscendingMessageHandler.h
+        ../src/AscendingMessageHandler.cpp
+        ../include/GlobalDefine.h
 )
 
 target_link_libraries(OPCClient

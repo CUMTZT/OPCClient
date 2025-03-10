@@ -7,18 +7,10 @@
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include <QDateTime>
-OPCClientManager *OPCClientManager::mpInstance = nullptr;
 
-std::mutex OPCClientManager::mMutex;
-
-OPCClientManager *OPCClientManager::getInstance() {
-    if (nullptr == mpInstance) {
-        std::scoped_lock lock(mMutex);
-        if (nullptr == mpInstance) {
-            mpInstance = new OPCClientManager();
-        }
-    }
-    return mpInstance;
+OPCClientManager& OPCClientManager::getInstance() {
+    static OPCClientManager instance;
+    return instance;
 }
 
 OPCClientManager::OPCClientManager() : QObject(nullptr) {
@@ -26,32 +18,24 @@ OPCClientManager::OPCClientManager() : QObject(nullptr) {
     mpKafkaProducerThread = new QThread(this);
     mpKafkaProducer->moveToThread(mpKafkaProducerThread);
     mpKafkaProducerThread->start();
+    mpAscendingMessageHandler = new AscendingMessageHandler(this);
 }
 
 OPCClientManager::~OPCClientManager() {
     for (auto& client : mClients){
-        client->stop();
+        client.second->stop();
     }
 }
 
 void OPCClientManager::loadConfig(const std::string &configFile) {
+    std::scoped_lock lock(mClientsMutex);
     try {
         auto config = YAML::LoadFile(configFile);
         if (config.IsNull() || !config["opc"]) {
             LogErr("配置文件解析错误！");
             return;
         }
-
         mConfig = config["opc"];
-        if (mConfig["interval"]) {
-            auto interval = mConfig["interval"].as<int>();
-            if (interval < 1) {
-                interval = 1;
-            }
-            //mpTimer->setInterval(interval);
-        } else {
-            LogWarn("配置文件中不存在采集间隔时间，使用默认值1000ms！");
-        }
         if (mConfig["clients"]) {
             for (int i = 0; i < mConfig["clients"].size(); i++) {
                 auto clientConfig = mConfig["clients"][i];
@@ -65,19 +49,29 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                     continue;
                 }
                 auto server = clientConfig["server"].as<std::string>();
-                if (!clientConfig["dist"]) {
-                    LogErr("配置文件中不存在OPC服务端URL！");
+                if (!clientConfig["topic"]) {
+                    LogErr("配置文件中不存在要发送的Topic！");
                     continue;
                 }
-                auto dist = clientConfig["dist"].as<std::string>();
+                auto topic = clientConfig["topic"].as<std::string>();
+
+                int interval = 1000;
+                if (clientConfig["interval"]) {
+                    interval = mConfig["interval"].as<int>();
+                    if (interval < 1) {
+                        interval = 1000;
+                    }
+                } else {
+                    LogWarn("配置文件中不存在采集间隔时间，使用默认值1000ms！");
+                }
 
                 auto client = new OPCClient(this);
                 client->setUrl(server);
                 client->setCode(code);
-                client->setDist(dist);
+                client->setTopic(topic);
+                client->setInterval(interval);
                 connect(client, &OPCClient::newData, mpKafkaProducer, &KafkaProducer::onNewDatas);
 
-                std::string node_code;
                 if (clientConfig["nodes_config"]) {
                     auto node_config_path = clientConfig["nodes_config"].as<std::string>();
                     try {
@@ -85,6 +79,7 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                         if (nodeConfig.IsNull()) {
                             continue;
                         }
+                        std::string node_code;
                         for (int j = 0; j < nodeConfig.size(); j++) {
                             if (!nodeConfig[j]["code"]) {
                                 LogErr("配置文件中不存在code！");
@@ -105,9 +100,8 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                 } else {
                     LogWarn("OPCClient配置中不存在nodes节点!");
                 }
-                std::scoped_lock lock(mClientsMutex);
                 client->start();
-                mClients.emplace_back(client);
+                mClients.try_emplace(code,client);
             }
         } else {
             LogWarn("配置文件中不存在OPC客户端配置！");
@@ -118,9 +112,20 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
     }
 }
 
-// void OPCClientManager::onTimerTimeout() {
-//     std::scoped_lock lock(mClientsMutex);
-//     for (auto client: mClients) {
-//         client->start();
-//     }
-// }
+void OPCClientManager::onSetDataValue(const std::string& code, const Data& data)
+{
+    std::scoped_lock lock(mClientsMutex);
+    auto iter = mClients.find(code);
+    if (iter == mClients.end())
+    {
+        throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", code));
+    }
+    auto client = iter->second;
+    try {
+        client->setDataValue(data);
+    }
+    catch (...)
+    {
+        std::rethrow_exception(std::current_exception());
+    }
+}

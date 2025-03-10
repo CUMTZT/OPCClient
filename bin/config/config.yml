@@ -10,12 +10,12 @@ kafka_producer:
 station_code: zouzhuang
 
 opc:
-  interval: 1000
   clients:
     -
       code: no1_machine
       server: opc.tcp://localhost:4840
-      dist: electric_trace_test
+      topic: electric_trace_test
+      interval: 1000
       nodes_config: ./config/no1_machine_nodes.yml
 
 
