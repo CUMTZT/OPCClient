@@ -35,6 +35,7 @@ private:
     OPCClientManager();
 
     static OPCClientManager* mpInstance;
+
     static std::recursive_mutex mMutex;
 
     std::unordered_map<std::string,OPCClient*>mClients;

@@ -10,10 +10,8 @@
 #include <mutex>
 #include <QThread>
 #include <yaml-cpp/node/convert.h>
-#include <QRunnable>
-#include "GlobalDefine.h"
 
-class OPCClient : public QThread {
+class OPCClient : public QObject {
     Q_OBJECT
 
 public:
@@ -23,37 +21,25 @@ public:
 
     void setCode(const std::string& code);
 
-    std::string getCode();
+    std::string code();
 
     void setUrl(const std::string &url);
 
-    std::string getURL();
+    std::string url();
 
     void addNode(const std::string &node);
 
-    std::set<std::string> nodes();
+    std::map<std::string,std::string> nodes();
 
     void setTopic(const std::string& topic);
 
     std::string topic();
 
-    void setInterval(int interval);
-
-    int interval();
-
-    void start();
-
-    void stop();
-
     void setDataValue(const Data& data);
 
-signals:
-    void newData(const std::string& topic,const std::string& code, const DataList& datas);
+    void connectServer();
 
 private:
-    void run() override;
-
-    void connectServer();
 
     std::string mUrl;
 
@@ -61,14 +47,14 @@ private:
 
     std::string mTopic;
 
-    std::atomic<int> mInterval;
-
     opcua::Client *mpClient = nullptr;
+
+    std::thread* mpThread = nullptr;
 
     std::recursive_mutex mClientLocker;
 
-    std::set<std::string> mNodes;
+    std::map<std::string,std::string> mNodes;
 
-    std::atomic<bool> mRunning = false;
+    std::mutex mNodesMutex;
 };
 #endif //OPCCLIENT_OPCCLIENT_H

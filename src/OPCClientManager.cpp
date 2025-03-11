@@ -30,9 +30,6 @@ OPCClientManager::OPCClientManager() : QObject(nullptr) {
 }
 
 OPCClientManager::~OPCClientManager() {
-    for (auto& client : mClients){
-        client.second->stop();
-    }
 }
 
 void OPCClientManager::loadConfig(const std::string &configFile) {
@@ -81,8 +78,6 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                 client->setUrl(server);
                 client->setCode(code);
                 client->setTopic(topic);
-                client->setInterval(interval);
-                connect(client, &OPCClient::newData, mpKafkaProducer, &KafkaProducer::onNewDatas);
 
                 if (clientConfig["nodes_config"]) {
                     auto node_config_path = clientConfig["nodes_config"].as<std::string>();
@@ -112,7 +107,7 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
                 } else {
                     LogWarn("OPCClient配置中不存在nodes节点!");
                 }
-                client->start();
+                client->connectServer();
                 mClients.try_emplace(code,client);
             }
         } else {
