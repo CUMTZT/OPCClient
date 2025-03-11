@@ -8,9 +8,17 @@
 #include "rapidjson/stringbuffer.h"
 #include <QDateTime>
 
-OPCClientManager& OPCClientManager::getInstance() {
-    static OPCClientManager instance;
-    return instance;
+OPCClientManager* OPCClientManager::mpInstance = nullptr;
+std::recursive_mutex OPCClientManager::mMutex;
+
+OPCClientManager* OPCClientManager::getInstance() {
+    if (nullptr == mpInstance) {
+        std::scoped_lock lock(mMutex);
+        if (nullptr == mpInstance) {
+            mpInstance = new OPCClientManager();
+        }
+    }
+    return mpInstance;
 }
 
 OPCClientManager::OPCClientManager() : QObject(nullptr) {
@@ -36,6 +44,10 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
             return;
         }
         mConfig = config["opc"];
+        if (mConfig["ascending_server_port"]) {
+            auto port = mConfig["ascending_server_port"].as<int>();
+            mpAscendingMessageHandler->setPort(port);
+        }
         if (mConfig["clients"]) {
             for (int i = 0; i < mConfig["clients"].size(); i++) {
                 auto clientConfig = mConfig["clients"][i];
@@ -57,7 +69,7 @@ void OPCClientManager::loadConfig(const std::string &configFile) {
 
                 int interval = 1000;
                 if (clientConfig["interval"]) {
-                    interval = mConfig["interval"].as<int>();
+                    interval = clientConfig["interval"].as<int>();
                     if (interval < 1) {
                         interval = 1000;
                     }
@@ -118,7 +130,7 @@ void OPCClientManager::onSetDataValue(const std::string& code, const Data& data)
     auto iter = mClients.find(code);
     if (iter == mClients.end())
     {
-        throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", code));
+        LogErr("上行指令没有找到对应客户端：{}", code);
     }
     auto client = iter->second;
     try {

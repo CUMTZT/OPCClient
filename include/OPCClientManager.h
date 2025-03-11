@@ -16,7 +16,7 @@ class OPCClientManager : public QObject {
     Q_OBJECT
 
 public:
-    static OPCClientManager& getInstance();
+    static OPCClientManager* getInstance();
 
     OPCClientManager(OPCClientManager const &) = delete;
 
@@ -31,7 +31,11 @@ public:
     void onSetDataValue(const std::string& code, const Data& data);
 
 private:
+
     OPCClientManager();
+
+    static OPCClientManager* mpInstance;
+    static std::recursive_mutex mMutex;
 
     std::unordered_map<std::string,OPCClient*>mClients;
 

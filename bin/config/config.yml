@@ -10,6 +10,7 @@ kafka_producer:
 station_code: zouzhuang
 
 opc:
+  ascending_server_port: 1234
   clients:
     -
       code: no1_machine
