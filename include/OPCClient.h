@@ -5,11 +5,13 @@
 #ifndef OPCCLIENT_OPCCLIENT_H
 #define OPCCLIENT_OPCCLIENT_H
 
+#include <QObject>
+#include <QTimer>
 #include <open62541pp/open62541pp.hpp>
 #include "GlobalDefine.h"
 #include <mutex>
-#include <QThread>
 #include <yaml-cpp/node/convert.h>
+#include <thread>
 
 class OPCClient : public QObject {
     Q_OBJECT
@@ -23,7 +25,7 @@ public:
 
     std::string code();
 
-    void setUrl(const std::string &url);
+    void setUrl(const std::string& url);
 
     std::string url();
 
@@ -37,11 +39,13 @@ public:
 
     void setDataValue(const Data& data);
 
+private slots:
+
     void connectServer();
 
 private:
 
-    std::string mUrl;
+    std::pair<bool,std::string> mUrl = {false,""};
 
     std::string mCode;
 
@@ -51,10 +55,12 @@ private:
 
     std::thread* mpThread = nullptr;
 
-    std::recursive_mutex mClientLocker;
+    std::mutex mClientLocker;
 
     std::map<std::string,std::string> mNodes;
 
     std::mutex mNodesMutex;
+
+    QTimer* mpReconnectTimer = nullptr;
 };
 #endif //OPCCLIENT_OPCCLIENT_H

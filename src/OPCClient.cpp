@@ -12,6 +12,8 @@
 #include <QString>
 #include <QTimer>
 
+#include "OPCClientManager.h"
+
 // 辅助函数：去除字符串两端的空白字符
 std::string trim(const std::string &s) {
     auto start = s.find_first_not_of(" \t\n\r");
@@ -40,6 +42,11 @@ OPCClient::OPCClient(QObject *parent) : QObject(parent) {
     qRegisterMetaType<std::pair<std::string, std::string> >("std::pair<std::string,std::string>");
     qRegisterMetaType<std::vector<std::pair<std::string, std::string> > >(
         "std::vector<std::pair<std::string,std::string>>");
+    mpReconnectTimer = new QTimer(this);
+    mpReconnectTimer->setTimerType(Qt::VeryCoarseTimer);
+    mpReconnectTimer->setInterval(1000);
+    connect(mpReconnectTimer,&QTimer::timeout,this,&OPCClient::connectServer);
+    mpReconnectTimer->start();
 }
 
 OPCClient::~OPCClient() {
@@ -58,13 +65,15 @@ std::string OPCClient::code() {
     return mCode;
 }
 
-void OPCClient::setUrl(const std::string &url) {
+void OPCClient::setUrl(const std::string &url)
+{
     std::scoped_lock lock(mClientLocker);
-    mUrl = url;
+    mUrl.first = true;
+    mUrl.second = url;
 }
 
 std::string OPCClient::url() {
-    return mUrl;
+    return mUrl.second;
 }
 
 void OPCClient::addNode(const std::string &node) {
@@ -90,8 +99,8 @@ std::string OPCClient::topic() {
 void OPCClient::setDataValue(const Data &data) {
     std::scoped_lock lock(mClientLocker);
     try {
-        if (nullptr == mpClient) {
-            return;
+        if (nullptr == mpClient || !mpClient->isConnected()) {
+            LogErr("未连接到OPCServer,发送失败！");
         }
         std::string nodeCode = data.first;
         std::string value = data.second;
@@ -102,22 +111,27 @@ void OPCClient::setDataValue(const Data &data) {
         if (!uaNode.exists()) {
             throw std::runtime_error(fmt::format("节点{}不存在！", nodeCode));
         }
+        auto retVar = uaNode.readValueAsync();
+        if (retVar.wait_for(std::chrono::milliseconds(1000)) != std::future_status::ready){
+            return;
+        }
+        uint32_t type = retVar.get()->type()->typeKind;
         opcua::Variant uaVar;
-        if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BOOLEAN) {
+        if (type == UA_DATATYPEKIND_BOOLEAN) {
             uaVar = opcua::Variant(string_to_bool(value));
-        } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_INT32) {
+        } else if (type == UA_DATATYPEKIND_INT32) {
             uaVar = opcua::Variant(QString::fromStdString(value).toInt());
-        } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BYTE) {
+        } else if (type == UA_DATATYPEKIND_BYTE) {
             uaVar = opcua::Variant(static_cast<uint8_t>(QString::fromStdString(value).toUInt()));
-        } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_FLOAT) {
+        } else if (type == UA_DATATYPEKIND_FLOAT) {
             uaVar = opcua::Variant(QString::fromStdString(value).toDouble());
-        } else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_STRING) {
+        } else if (type == UA_DATATYPEKIND_STRING) {
             uaVar = opcua::Variant(value);
         } else {
-            LogWarn("不支持的数据类型: {}!", uaNode.readValue().type()->typeKind);
+            LogWarn("不支持的数据类型: {}!", type);
         }
-        uaNode.writeValue(uaVar);
-    } catch (...) {
+        uaNode.writeValueAsync(uaVar);
+    } catch (std::exception &e) {
         std::rethrow_exception(std::current_exception());
     }
 }
@@ -125,103 +139,66 @@ void OPCClient::setDataValue(const Data &data) {
 void OPCClient::connectServer() {
     std::scoped_lock lock(mClientLocker);
     try {
-        if (nullptr != mpClient) {
-            if (mpClient->isConnected()) {
-                mpClient->disconnect();
-            }
-            delete mpClient;
-            mpClient = nullptr;
+        if (!mUrl.first){
+            return;
         }
-        if (mUrl.empty()) {
-            LogErr("OPC Server Url为空！");
-        }
-        mpClient = new opcua::Client();
-        mpClient->onConnected([this]() {
-            LogInfo("[{}]成功连接到OPC服务端[{}]", mCode, mUrl);
-        });
-        mpClient->onDisconnected([this]() {
-            LogInfo("[{}]与OPC服务端[{}]断开连接", mCode, mUrl);
-        });
-        mpClient->onSessionClosed([this]() {
-            LogInfo("[{}]与OPC服务端[{}] Session关闭", mCode, mUrl);
-        });
-        mpClient->onSessionActivated([&] {
-            std::cout << "Session activated" << std::endl;
-
-            // Schedule async operations once the client session is activated
-            // 1. Read request
-            opcua::services::readValueAsync(
-                *mpClient,
-                {1,22},
-                [](opcua::Result<opcua::Variant> &result) {
-                    auto value = result.value().to<std::string>();
-                    //LogInfo("{}", value.data);
+        if (mUrl.second.empty()) {
+            LogErr("OPC Url为空,客户端主动断开连接");
+            if (nullptr != mpClient){
+                if (mpClient->isConnected()){
+                    mpClient->disconnect();
                 }
-            );
-            //
-            // // 2. Browse request of Server object
-            // const opcua::BrowseDescription bd(
-            //     opcua::ObjectId::Server,
-            //     opcua::BrowseDirection::Forward,
-            //     opcua::ReferenceTypeId::References
-            // );
-            // opcua::services::browseAsync(*mpClient, bd, 0, [](opcua::BrowseResult &result) {
-            //     std::cout << "Browse result with " << result.references().size() << " references:\n";
-            //     for (const auto &reference: result.references()) {
-            //         std::cout << "- " << reference.browseName().name() << std::endl;
-            //     }
-            // });
-            //
-            // // 3. Subscription
-            // opcua::services::createSubscriptionAsync(
-            //     *mpClient,
-            //     opcua::SubscriptionParameters{}, // default subscription parameters
-            //     true, // publishingEnabled
-            //     {}, // statusChangeCallback
-            //     [](opcua::IntegerId subId) {
-            //         std::cout << "Subscription deleted: " << subId << std::endl;
-            //     },
-            //     [&](opcua::CreateSubscriptionResponse &response) {
-            //         std::cout
-            //                 << "Subscription created:\n"
-            //                 << "- status code: " << response.responseHeader().serviceResult() << "\n"
-            //                 << "- subscription id: " << response.subscriptionId() << std::endl;
-            //
-            //         // Create MonitoredItem
-            //         opcua::services::createMonitoredItemDataChangeAsync(
-            //             *mpClient,
-            //             response.subscriptionId(),
-            //             opcua::ReadValueId(
-            //                 {1,22},
-            //                 opcua::AttributeId::Value
-            //             ),
-            //             opcua::MonitoringMode::Reporting,
-            //             opcua::MonitoringParametersEx{}, // default monitoring parameters
-            //             [](opcua::IntegerId subId, opcua::IntegerId monId, const opcua::DataValue &dv) {
-            //                 std::cout
-            //                         << "Data change notification:\n"
-            //                         << "- subscription id: " << subId << "\n"
-            //                         << "- monitored item id: " << monId << "\n"
-            //                         << "- timestamp: " << dv.sourceTimestamp() << std::endl;
-            //             },
-            //             {}, // delete callback
-            //             [](opcua::MonitoredItemCreateResult &result) {
-            //                 std::cout
-            //                         << "MonitoredItem created:\n"
-            //                         << "- status code: " << result.statusCode() << "\n"
-            //                         << "- monitored item id: " << result.monitoredItemId() << std::endl;
-            //             }
-            //         );
-            //     }
-            // );
-        });
-        mpClient->connectAsync(mUrl);
+                delete mpClient;
+                mpClient = nullptr;
+            }
+            mUrl.first = false;
+            return;
+        }
+        if (nullptr == mpClient){
+            mpClient = new opcua::Client();
+            mpClient->onConnected([this]() {
+                LogInfo("[{}]成功连接到OPC服务端[{}]", mCode, mUrl.second);
+            });
+            mpClient->onDisconnected([this]() {
+                LogInfo("[{}]与OPC服务端[{}]断开连接", mCode, mUrl.second);
+            });
+            mpClient->onSessionClosed([this]() {
+                LogInfo("[{}]与OPC服务端[{}] Session关闭", mCode, mUrl.second);
+            });
+            mpClient->onSessionActivated([&] {
+                std::cout << "Session activated" << std::endl;
+                opcua::services::readValueAsync(
+                    *mpClient,
+                    {1,22},
+                    [](opcua::Result<opcua::Variant> &result) {
+                        auto value = result.value().to<std::string>();
+                        LogInfo("{}", value);
+                    }
+                );
+            });
+        }
+        if (mpClient->isConnected())
+        {
+            mpClient->disconnect();
+            mpThread->join();
+            delete mpThread;
+            mpThread = nullptr;
+        }
+        mpClient->connectAsync(mUrl.second);
         mpThread = new std::thread([this]() {
-            mpClient->run();
+            try{
+                mUrl.first = false;
+                mpClient->run();
+            }
+            catch (...){
+                mUrl.first = true;
+                LogErr("连接到OPCServer:{}失败!",mUrl.second);
+            }
         });
-    } catch (const std::exception &e) {
+    } catch (...) {
         delete mpClient;
         mpClient = nullptr;
-        LogErr("连接OPC Server失败{}！", e.what());
+        mUrl.first = true;
+        LogErr("连接到OPCServer:{}失败!",mUrl.second);
     }
 }
