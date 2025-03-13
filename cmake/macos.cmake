@@ -1,4 +1,4 @@
-set(CMAKE_PREFIX_PATH  "/Users/zhangteng/Desktop/zhangteng/Workspace/runtime/macos/Qt/6.8.2/macos/lib/cmake")
+set(CMAKE_PREFIX_PATH  "/Users/zhangteng/Workspace/runtime/macos/Qt/6.8.2/macos/lib/cmake")
 set(DEPENDENCY_PATH "${OPC_CLIENT_RUNTIME_DIR}/macos")
 
 find_package(Qt6 REQUIRED COMPONENTS Core)

@@ -12,6 +12,8 @@
 #include "KafkaProducer.h"
 #include <map>
 #include "AscendingMessageHandler.h"
+
+#include "cpp-httplib/httplib.h"
 class OPCClientManager : public QObject {
     Q_OBJECT
 
@@ -34,6 +36,8 @@ private:
 
     OPCClientManager();
 
+    void stopHttpServer();
+
     static OPCClientManager* mpInstance;
     static std::recursive_mutex mMutex;
 
@@ -47,7 +51,9 @@ private:
 
     YAML::Node mConfig;
 
-    AscendingMessageHandler* mpAscendingMessageHandler = nullptr;
+    httplib::Server* mpHttpServer = nullptr;
+
+    std::thread* mpHttpServerThread = nullptr;
 };
 
 #define OPCClientManagerIns OPCClientManager::getInstance()

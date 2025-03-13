@@ -140,34 +140,36 @@ void OPCClient::setDataValue(const Data& data)
         std::string first = nodeCode.substr(0, index);
         std::string second = nodeCode.substr(index + 1);
         opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
+        auto oldUaVar = uaNode.readValue();
+        uint32_t type = oldUaVar.type()->typeKind;
         if (!uaNode.exists())
         {
             throw std::runtime_error(fmt::format("节点{}不存在！", nodeCode));
         }
         opcua::Variant uaVar;
-        if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BOOLEAN)
+        if (type == UA_DATATYPEKIND_BOOLEAN)
         {
             uaVar = opcua::Variant(string_to_bool(value));
         }
-        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_INT32)
+        else if (type == UA_DATATYPEKIND_INT32)
         {
             uaVar = opcua::Variant(QString::fromStdString(value).toInt());
         }
-        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BYTE)
+        else if (type == UA_DATATYPEKIND_BYTE)
         {
             uaVar = opcua::Variant(static_cast<uint8_t>(QString::fromStdString(value).toUInt()));
         }
-        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_FLOAT)
+        else if (type == UA_DATATYPEKIND_FLOAT)
         {
             uaVar = opcua::Variant(QString::fromStdString(value).toDouble());
         }
-        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_STRING)
+        else if (type == UA_DATATYPEKIND_STRING)
         {
             uaVar = opcua::Variant(value);
         }
         else
         {
-            LogWarn("不支持的数据类型: {}!", uaNode.readValue().type()->typeKind);
+            LogWarn("不支持的数据类型: {}!", type);
         }
         uaNode.writeValue(uaVar);
     }
@@ -235,7 +237,7 @@ void OPCClient::run()
                         opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
                         std::string name = std::string(uaNode.readBrowseName().name());
                         data.first = node;
-                        if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BOOLEAN)
+                        if (type == UA_DATATYPEKIND_BOOLEAN)
                         {
                             type = "bool";
                             if (uaNode.readValue().to<bool>())
@@ -247,34 +249,34 @@ void OPCClient::run()
                                 data.second = "0";
                             }
                         }
-                        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_INT32)
+                        else if (type == UA_DATATYPEKIND_INT32)
                         {
                             type = "int32";
                             data.second = QString::number(uaNode.readValue().to<int32_t>()).toStdString();
                         }
-                        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_BYTE)
+                        else if (type == UA_DATATYPEKIND_BYTE)
                         {
                             type = "byte";
                             data.second = QString::number(uaNode.readValue().to<uint8_t>()).toStdString();
                         }
-                        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_FLOAT)
+                        else if (type == UA_DATATYPEKIND_FLOAT)
                         {
                             type = "float";
                             data.second = QString::number(uaNode.readValue().to<float>()).toStdString();
                         }
-                        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_DATETIME)
+                        else if (type == UA_DATATYPEKIND_DATETIME)
                         {
                             type = "datetime";
                             data.second = QString::number(uaNode.readValue().to<uint32_t>()).toStdString();
                         }
-                        else if (uaNode.readValue().type()->typeKind == UA_DATATYPEKIND_STRING)
+                        else if (type == UA_DATATYPEKIND_STRING)
                         {
                             type = "string";
                             data.second = uaNode.readValue().to<std::string>();
                         }
                         else
                         {
-                            LogErr("Read Unsupported Data Type: {}!", uaNode.readValue().type()->typeKind);
+                            LogErr("Read Unsupported Data Type: {}!", type);
                             continue;
                         }
                         LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", node, name, type, data.second);

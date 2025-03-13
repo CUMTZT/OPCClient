@@ -70,5 +70,9 @@ private:
     std::set<std::string> mNodes;
 
     std::atomic<bool> mRunning = false;
+
+    QTimer* mpReconnectTimer = nullptr;
+
+    QThread* mpReconnectThread = nullptr;//TODO,改成Timer触发，slot在Thread里执行
 };
 #endif //OPCCLIENT_OPCCLIENT_H
