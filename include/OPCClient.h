@@ -8,12 +8,12 @@
 #include <open62541pp/open62541pp.hpp>
 #include "GlobalDefine.h"
 #include <mutex>
-#include <QThread>
 #include <yaml-cpp/node/convert.h>
 #include <QRunnable>
-#include "GlobalDefine.h"
+#include <QTimer>
+#include <QThread>
 
-class OPCClient : public QThread {
+class OPCClient : public QObject {
     Q_OBJECT
 
 public:
@@ -50,10 +50,13 @@ public:
 signals:
     void newData(const std::string& topic,const std::string& code, const DataList& datas);
 
-private:
-    void run() override;
+private slots:
 
-    void connectServer();
+    void connectServer(bool reconnect = false);
+
+    void collectData();
+
+private:
 
     std::string mUrl;
 
@@ -61,18 +64,16 @@ private:
 
     std::string mTopic;
 
-    std::atomic<int> mInterval;
-
-    opcua::Client *mpClient = nullptr;
+    std::unique_ptr<opcua::Client> mpClient = nullptr;
 
     std::recursive_mutex mClientLocker;
 
     std::set<std::string> mNodes;
 
-    std::atomic<bool> mRunning = false;
-
     QTimer* mpReconnectTimer = nullptr;
 
-    QThread* mpReconnectThread = nullptr;//TODO,改成Timer触发，slot在Thread里执行
+    QTimer* mpDataTimer = nullptr;
+
+    QThread* mpDataThread = nullptr;
 };
 #endif //OPCCLIENT_OPCCLIENT_H

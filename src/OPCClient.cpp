@@ -12,8 +12,7 @@
 #include <QString>
 
 // 辅助函数：去除字符串两端的空白字符
-std::string trim(const std::string& s)
-{
+std::string trim(const std::string &s) {
     auto start = s.find_first_not_of(" \t\n\r");
     if (start == std::string::npos) return "";
     auto end = s.find_last_not_of(" \t\n\r");
@@ -21,116 +20,102 @@ std::string trim(const std::string& s)
 }
 
 // 转换函数：将字符串转换为布尔值
-bool string_to_bool(const std::string& s)
-{
+bool string_to_bool(const std::string &s) {
     std::string trimmed = trim(s);
     std::transform(trimmed.begin(), trimmed.end(), trimmed.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
-    if (trimmed == "true" || trimmed == "1")
-    {
+    if (trimmed == "true" || trimmed == "1") {
         return true;
     }
-    if (trimmed == "false" || trimmed == "0")
-    {
+    if (trimmed == "false" || trimmed == "0") {
         return false;
     }
     throw std::invalid_argument("Invalid boolean string: " + s);
 }
 
-OPCClient::OPCClient(QObject* parent) : QThread(parent)
-{
+OPCClient::OPCClient(QObject *parent) : QObject(parent) {
     qRegisterMetaType<std::string>("std::string");
-    qRegisterMetaType<std::pair<std::string, std::string>>("std::pair<std::string,std::string>");
-    qRegisterMetaType<std::vector<std::pair<std::string, std::string>>>(
+    qRegisterMetaType<std::pair<std::string, std::string> >("std::pair<std::string,std::string>");
+    qRegisterMetaType<std::vector<std::pair<std::string, std::string> > >(
         "std::vector<std::pair<std::string,std::string>>");
+    mpClient = std::make_unique<opcua::Client>();
 }
 
-OPCClient::~OPCClient()
-{
+OPCClient::~OPCClient() {
     std::scoped_lock lock(mClientLocker);
     delete mpClient;
     mpClient = nullptr;
 }
 
-void OPCClient::setCode(const std::string& code)
-{
+void OPCClient::setCode(const std::string &code) {
     std::scoped_lock lock(mClientLocker);
     mCode = code;
 }
 
-std::string OPCClient::getCode()
-{
+std::string OPCClient::getCode() {
     std::scoped_lock lock(mClientLocker);
     return mCode;
 }
 
-std::string OPCClient::getURL()
-{
+std::string OPCClient::getURL() {
     return mUrl;
 }
 
-void OPCClient::setUrl(const std::string& url)
-{
+void OPCClient::setUrl(const std::string &url) {
     std::scoped_lock lock(mClientLocker);
     mUrl = url;
 }
 
-void OPCClient::addNode(const std::string& node)
-{
+void OPCClient::addNode(const std::string &node) {
     std::scoped_lock lock(mClientLocker);
     mNodes.insert(node);
 }
 
-std::set<std::string> OPCClient::nodes()
-{
+std::set<std::string> OPCClient::nodes() {
     std::scoped_lock lock(mClientLocker);
     return mNodes;
 }
 
-void OPCClient::setTopic(const std::string& dist)
-{
+void OPCClient::setTopic(const std::string &dist) {
     std::scoped_lock lock(mClientLocker);
     mTopic = dist;
 }
 
-std::string OPCClient::topic()
-{
+std::string OPCClient::topic() {
     std::scoped_lock lock(mClientLocker);
     return mTopic;
 }
 
-void OPCClient::setInterval(int interval)
-{
-    std::scoped_lock lock(mClientLocker);
-    mInterval = interval;
+void OPCClient::setInterval(int interval) {
+    mpDataTimer->setInterval(interval);
 }
 
-int OPCClient::interval()
-{
-    std::scoped_lock lock(mClientLocker);
-    return mInterval;
+int OPCClient::interval() {
+    return mpDataTimer->interval();
 }
 
-void OPCClient::start()
-{
-    std::scoped_lock lock(mClientLocker);
-    mRunning = true;
-    QThread::start();
+void OPCClient::start() {
+    if (!mpReconnectTimer->isActive()) {
+        mpReconnectTimer->start();
+    }
+    if (!mpDataTimer->isActive()) {
+        mpDataTimer->start();
+    }
 }
 
-void OPCClient::stop()
-{
-    std::scoped_lock lock(mClientLocker);
-    mRunning = false;
-    wait();
+void OPCClient::stop() {
+    if (mpReconnectTimer->isActive()) {
+        mpReconnectTimer->stop();
+    }
+    if (mpDataTimer->isActive()) {
+        mpDataTimer->stop();
+    }
 }
 
-void OPCClient::setDataValue(const Data& data)
-{
+void OPCClient::setDataValue(const Data &data) {
     std::scoped_lock lock(mClientLocker);
-    try
-    {
+    try {
         if (nullptr == mpClient || !mpClient->isConnected()) {
             connectServer();
         }
@@ -142,157 +127,100 @@ void OPCClient::setDataValue(const Data& data)
         opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
         auto oldUaVar = uaNode.readValue();
         uint32_t type = oldUaVar.type()->typeKind;
-        if (!uaNode.exists())
-        {
+        if (!uaNode.exists()) {
             throw std::runtime_error(fmt::format("节点{}不存在！", nodeCode));
         }
         opcua::Variant uaVar;
-        if (type == UA_DATATYPEKIND_BOOLEAN)
-        {
+        if (type == UA_DATATYPEKIND_BOOLEAN) {
             uaVar = opcua::Variant(string_to_bool(value));
-        }
-        else if (type == UA_DATATYPEKIND_INT32)
-        {
+        } else if (type == UA_DATATYPEKIND_INT32) {
             uaVar = opcua::Variant(QString::fromStdString(value).toInt());
-        }
-        else if (type == UA_DATATYPEKIND_BYTE)
-        {
+        } else if (type == UA_DATATYPEKIND_BYTE) {
             uaVar = opcua::Variant(static_cast<uint8_t>(QString::fromStdString(value).toUInt()));
-        }
-        else if (type == UA_DATATYPEKIND_FLOAT)
-        {
+        } else if (type == UA_DATATYPEKIND_FLOAT) {
             uaVar = opcua::Variant(QString::fromStdString(value).toDouble());
-        }
-        else if (type == UA_DATATYPEKIND_STRING)
-        {
+        } else if (type == UA_DATATYPEKIND_STRING) {
             uaVar = opcua::Variant(value);
-        }
-        else
-        {
+        } else {
             LogWarn("不支持的数据类型: {}!", type);
         }
         uaNode.writeValue(uaVar);
-    }
-    catch (...)
-    {
+    } catch (...) {
         std::rethrow_exception(std::current_exception());
     }
 }
 
-void OPCClient::connectServer()
-{
+void OPCClient::connectServer(bool reconnect) {
     std::scoped_lock lock(mClientLocker);
-    try
-    {
-        if (nullptr != mpClient)
-        {
-            if (mpClient->isConnected())
-            {
-                mpClient->disconnect();
-            }
-            delete mpClient;
-            mpClient = nullptr;
+    try {
+        if (mpClient->isConnected()) {
+            mpClient->disconnect();
         }
-        if (mUrl.empty())
-        {
-            LogErr("OPC Server Url为空！");
+        if (mUrl.empty()) {
+            LogInfo("OPServer Url为空,断开连接");
+            return;
         }
-        mpClient = new opcua::Client();
         mpClient->connect(mUrl);
-    }
-    catch (const std::exception& e)
-    {
-        delete mpClient;
-        mpClient = nullptr;
+    } catch (const std::exception &e) {
         LogErr("连接OPC Server失败{}！", e.what());
     }
 }
 
-void OPCClient::run()
-{
-    while (mRunning)
-    {
-        {
-            std::scoped_lock lock(mClientLocker);
-            if (nullptr == mpClient)
-            {
-                connectServer();
-            }
-            if (nullptr != mpClient && mpClient->isConnected())
-            {
-                try
-                {
-                    DataList datas;
-                    for (auto node : mNodes)
-                    {
-                        std::pair<std::string, std::string> data;
-                        std::string type;
-                        std::size_t index = node.find_first_of('_');
-                        if (index == std::string::npos)
-                        {
-                            continue;
-                        }
-                        std::string first = node.substr(0, index);
-                        std::string second = node.substr(index + 1);
-                        opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
-                        std::string name = std::string(uaNode.readBrowseName().name());
-                        data.first = node;
-                        if (type == UA_DATATYPEKIND_BOOLEAN)
-                        {
-                            type = "bool";
-                            if (uaNode.readValue().to<bool>())
-                            {
-                                data.second = "1";
-                            }
-                            else
-                            {
-                                data.second = "0";
-                            }
-                        }
-                        else if (type == UA_DATATYPEKIND_INT32)
-                        {
-                            type = "int32";
-                            data.second = QString::number(uaNode.readValue().to<int32_t>()).toStdString();
-                        }
-                        else if (type == UA_DATATYPEKIND_BYTE)
-                        {
-                            type = "byte";
-                            data.second = QString::number(uaNode.readValue().to<uint8_t>()).toStdString();
-                        }
-                        else if (type == UA_DATATYPEKIND_FLOAT)
-                        {
-                            type = "float";
-                            data.second = QString::number(uaNode.readValue().to<float>()).toStdString();
-                        }
-                        else if (type == UA_DATATYPEKIND_DATETIME)
-                        {
-                            type = "datetime";
-                            data.second = QString::number(uaNode.readValue().to<uint32_t>()).toStdString();
-                        }
-                        else if (type == UA_DATATYPEKIND_STRING)
-                        {
-                            type = "string";
-                            data.second = uaNode.readValue().to<std::string>();
-                        }
-                        else
-                        {
-                            LogErr("Read Unsupported Data Type: {}!", type);
-                            continue;
-                        }
-                        LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", node, name, type, data.second);
-                        datas.emplace_back(data);
-                    }
-                    if (!datas.empty())
-                    {
-                        emit newData(mTopic, mCode, datas);
-                    }
+void OPCClient::collectData() {
+    std::scoped_lock lock(mClientLocker);
+    if (mpClient->isConnected()) {
+        try {
+            DataList datas;
+            for (auto node: mNodes) {
+                std::pair<std::string, std::string> data;
+
+                std::string type;
+                std::size_t index = node.find_first_of('_');
+                if (index == std::string::npos) {
+                    continue;
                 }
-                catch (std::exception& e)
-                {
-                    LogErr("{}", e.what());
+                std::string first = node.substr(0, index);
+                std::string second = node.substr(index + 1);
+                opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
+                auto uaValue = uaNode.readValue();
+                uint32_t typeKind = uaValue.type()->typeKind;
+                std::string name = std::string(uaNode.readBrowseName().name());
+                data.first = node;
+                if (typeKind == UA_DATATYPEKIND_BOOLEAN) {
+                    type = "bool";
+                    if (uaNode.readValue().to<bool>()) {
+                        data.second = "1";
+                    } else {
+                        data.second = "0";
+                    }
+                } else if (typeKind == UA_DATATYPEKIND_INT32) {
+                    type = "int32";
+                    data.second = QString::number(uaNode.readValue().to<int32_t>()).toStdString();
+                } else if (typeKind == UA_DATATYPEKIND_BYTE) {
+                    type = "byte";
+                    data.second = QString::number(uaNode.readValue().to<uint8_t>()).toStdString();
+                } else if (typeKind == UA_DATATYPEKIND_FLOAT) {
+                    type = "float";
+                    data.second = QString::number(uaNode.readValue().to<float>()).toStdString();
+                } else if (typeKind == UA_DATATYPEKIND_DATETIME) {
+                    type = "datetime";
+                    data.second = QString::number(uaNode.readValue().to<uint32_t>()).toStdString();
+                } else if (typeKind == UA_DATATYPEKIND_STRING) {
+                    type = "string";
+                    data.second = uaNode.readValue().to<std::string>();
+                } else {
+                    LogErr("Read Unsupported Data Type: {}!", type);
+                    continue;
                 }
+                LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", node, name, type, data.second);
+                datas.emplace_back(data);
             }
+            if (!datas.empty()) {
+                emit newData(mTopic, mCode, datas);
+            }
+        } catch (std::exception &e) {
+            LogErr("{}", e.what());
         }
-        msleep(mInterval);
     }
 }
+
