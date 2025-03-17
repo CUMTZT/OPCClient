@@ -14,7 +14,6 @@ int main(int argc, char *argv[]) {
     QDir::setCurrent(QCoreApplication::applicationDirPath());
     std::string configFile = "./config/config.yml";
     LoggerIns.loadConfig(configFile);
-    QThread::currentThreadId();
     OPCClientManagerIns->loadConfig(configFile);
     return a.exec();
 }

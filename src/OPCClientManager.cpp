@@ -5,10 +5,22 @@
 #include <yaml-cpp/yaml.h>
 #include "Logger.h"
 #include "rapidjson/prettywriter.h"
-#include "rapidjson/stringbuffer.h"
 #include <QDateTime>
 
+std::optional<std::string> getExceptionPtrMsg(const std::exception_ptr& eptr) // passing by value is ok
+{
+    try {
+        if (eptr) {
+            std::rethrow_exception(eptr);
+        }
+    } catch(const std::exception& e) {
+        return e.what();
+    }
+    return {};
+}
+
 OPCClientManager* OPCClientManager::mpInstance = nullptr;
+
 std::recursive_mutex OPCClientManager::mMutex;
 
 OPCClientManager* OPCClientManager::getInstance()
@@ -33,19 +45,24 @@ OPCClientManager::OPCClientManager() : QObject(nullptr)
     mpHttpServer = new httplib::Server();
     mpHttpServer->Get("/update", [this](const httplib::Request& req, httplib::Response& res)
     {
-        LogInfo("update");
         std::string machine = req.get_param_value("machine");
         std::string code = req.get_param_value("code");
         std::string value = req.get_param_value("value");
-        try
-        {
-            onSetDataValue(machine, {code, value});
+        try{
+            std::scoped_lock lock(mMutex);
+            auto iter = mClients.find(machine);
+            if (iter == mClients.end())
+            {
+                throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", machine));
+            }
+            auto client = iter->second;
+            client->setDataValue({code, value});
             res.status = 200;
-            res.set_content("Success!\n", "text/plain");
+            res.set_content("<p>指令上行成功<span style='color:green;'>%s</span></p>", "text/html");
         }
-        catch (...)
+        catch (std::exception &e)
         {
-            const char* fmt = "<p>Exception Occured: <span style='color:red;'>%s</span></p>";
+            const char* fmt = fmt::format("<p>发送上行指令失败！原因：{}<span style='color:red;'>%s</span></p>",e.what()).c_str();
             char buf[BUFSIZ];
             snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
             res.status = 500;
@@ -56,7 +73,11 @@ OPCClientManager::OPCClientManager() : QObject(nullptr)
     mpHttpServer->set_exception_handler(
         [](const httplib::Request& /*req*/, httplib::Response& res, const std::exception_ptr& ep)
         {
-            const char* fmt = "<p>Exception Occured: <span style='color:red;'>%s</span></p>";
+            std::optional<std::string> exceptionPtrMsg = getExceptionPtrMsg(ep);
+            if (!exceptionPtrMsg.has_value()){
+                return;
+            }
+            const char* fmt = fmt::format("<p>发送上行指令失败！原因：{}<span style='color:red;'>%s</span></p>",exceptionPtrMsg.value()).c_str();
             char buf[BUFSIZ];
             snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
             res.status = 500;
@@ -65,16 +86,17 @@ OPCClientManager::OPCClientManager() : QObject(nullptr)
 
     mpHttpServer->set_error_handler([](const httplib::Request& /*req*/, httplib::Response& res)
     {
-        const char* fmt = "<p>Error Status: <span style='color:red;'>%d</span></p>";
+        const char* fmt = fmt::format("<p>发送上行指令失败！原因：未知<span style='color:red;'>%s</span></p>").c_str();
         char buf[BUFSIZ];
-        snprintf(buf, sizeof(buf), fmt, res.status);
+        snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
+        res.status = 500;
         res.set_content(buf, "text/html");
     });
     mpHttpServerThread = new std::thread([=, this]()
     {
         if (mpHttpServer->listen("localhost", 1234))
         {
-            LogInfo("Listen Success On{}", 1234);
+            LogInfo("指令上行Http服务正在监听端口：{}", 1234);
         }
     });
 }
@@ -114,7 +136,8 @@ void OPCClientManager::loadConfig(const std::string& configFile)
             for (int i = 0; i < mConfig["clients"].size(); i++)
             {
                 auto clientConfig = mConfig["clients"][i];
-                if (!clientConfig["code"]){
+                if (!clientConfig["code"])
+                {
                     LogErr("配置文件中不存在OPC客户端ID！");
                     continue;
                 }
@@ -133,83 +156,84 @@ void OPCClientManager::loadConfig(const std::string& configFile)
                 auto topic = clientConfig["topic"].as<std::string>();
 
                 int interval = 1000;
-                if (clientConfig["interval"]){
+                if (clientConfig["interval"])
+                {
                     interval = clientConfig["interval"].as<int>();
-                    if (interval < 1){
+                    if (interval < 1)
+                    {
                         interval = 1000;
                     }
                 }
-                else{
+                else
+                {
                     LogWarn("配置文件中不存在采集间隔时间，使用默认值1000ms！");
                 }
 
-                auto client = new OPCClient(this);
+                auto client = std::make_shared<OPCClient>();
                 client->setUrl(server);
                 client->setCode(code);
                 client->setTopic(topic);
                 client->setInterval(interval);
-                connect(client, &OPCClient::newData, mpKafkaProducer, &KafkaProducer::onNewDatas);
+                connect(client.get(), &OPCClient::newData, mpKafkaProducer, &KafkaProducer::onNewDatas);
+                client->start();
 
-                if (clientConfig["nodes_config"]){
+                if (clientConfig["nodes_config"])
+                {
                     auto node_config_path = clientConfig["nodes_config"].as<std::string>();
-                    try{
+                    try
+                    {
                         auto nodeConfig = YAML::LoadFile(node_config_path);
-                        if (nodeConfig.IsNull()){
+                        if (nodeConfig.IsNull())
+                        {
                             continue;
                         }
                         std::string node_code;
-                        for (int j = 0; j < nodeConfig.size(); j++){
-                            if (!nodeConfig[j]["code"]){
+                        for (int j = 0; j < nodeConfig.size(); j++)
+                        {
+                            if (!nodeConfig[j]["code"])
+                            {
                                 LogErr("配置文件中不存在code！");
                                 continue;
                             }
                             node_code = nodeConfig[j]["code"].as<std::string>();
                             client->addNode(node_code);
-                            if (!nodeConfig[j]["name"]){
+                            if (!nodeConfig[j]["name"])
+                            {
                                 LogErr("配置文件中不存在name！");
                                 continue;
                             }
                             auto node_name = nodeConfig[j]["name"].as<std::string>();
                         }
                     }
-                    catch (YAML::Exception& e){
+                    catch (YAML::Exception& e)
+                    {
                         LogErr("{}", e.msg);
                     }
                 }
-                else{
+                else
+                {
                     LogWarn("OPCClient配置中不存在nodes节点!");
                 }
                 client->start();
-                mClients.try_emplace(code, client);
+                mClients.emplace(code, client);
             }
         }
-        else{
+        else
+        {
             LogWarn("配置文件中不存在OPC客户端配置！");
         }
         mpKafkaProducer->loadConfig(configFile);
     }
-    catch (const YAML::Exception& e){
+    catch (const YAML::Exception& e)
+    {
         LogErr("{}", e.msg);
     }
 }
 
-void OPCClientManager::onSetDataValue(const std::string& code, const Data& data){
-    std::scoped_lock lock(mClientsMutex);
-    auto iter = mClients.find(code);
-    if (iter == mClients.end()){
-        LogErr("上行指令没有找到对应客户端：{}", code);
-    }
-    auto client = iter->second;
-    try{
-        client->setDataValue(data);
-    }
-    catch (...){
-        std::rethrow_exception(std::current_exception());
-    }
-}
-
-void OPCClientManager::stopHttpServer(){
-    if(mpHttpServer->is_running()){
+void OPCClientManager::stopHttpServer()
+{
+    if (mpHttpServer->is_running())
+    {
         mpHttpServer->stop();
         mpHttpServerThread->join();
         delete mpHttpServerThread;

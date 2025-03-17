@@ -4,15 +4,8 @@
 
 #ifndef OPCCLIENTMANAGER_H
 #define OPCCLIENTMANAGER_H
-#include <QMap>
-#include <QThreadPool>
-#include <QThread>
-#include <QTimer>
 #include "OPCClient.h"
 #include "KafkaProducer.h"
-#include <map>
-#include "AscendingMessageHandler.h"
-
 #include "cpp-httplib/httplib.h"
 class OPCClientManager : public QObject {
     Q_OBJECT
@@ -30,8 +23,6 @@ public:
 
     void loadConfig(const std::string &configFile);
 
-    void onSetDataValue(const std::string& code, const Data& data);
-
 private:
 
     OPCClientManager();
@@ -39,9 +30,10 @@ private:
     void stopHttpServer();
 
     static OPCClientManager* mpInstance;
+
     static std::recursive_mutex mMutex;
 
-    std::unordered_map<std::string,OPCClient*>mClients;
+    std::unordered_map<std::string,std::shared_ptr<OPCClient>>mClients;
 
     std::recursive_mutex mClientsMutex;
 

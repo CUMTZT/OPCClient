@@ -7,13 +7,11 @@
 
 #include <open62541pp/open62541pp.hpp>
 #include "GlobalDefine.h"
-#include <mutex>
 #include <yaml-cpp/node/convert.h>
-#include <QRunnable>
 #include <QTimer>
 #include <QThread>
 
-class OPCClient : public QObject {
+class OPCClient : public QThread {
     Q_OBJECT
 
 public:
@@ -23,11 +21,11 @@ public:
 
     void setCode(const std::string& code);
 
-    std::string getCode();
+    std::string code();
 
     void setUrl(const std::string &url);
 
-    std::string getURL();
+    [[nodiscard]] std::string url() const;
 
     void addNode(const std::string &node);
 
@@ -52,11 +50,13 @@ signals:
 
 private slots:
 
-    void connectServer(bool reconnect = false);
-
-    void collectData();
+    void connectServer();
 
 private:
+
+    void run() override;
+
+    bool isConnected();
 
     std::string mUrl;
 
@@ -66,14 +66,12 @@ private:
 
     std::unique_ptr<opcua::Client> mpClient = nullptr;
 
-    std::recursive_mutex mClientLocker;
+    std::mutex mClientLocker;
 
     std::set<std::string> mNodes;
 
     QTimer* mpReconnectTimer = nullptr;
 
-    QTimer* mpDataTimer = nullptr;
-
-    QThread* mpDataThread = nullptr;
+    std::atomic<int> mInterval = 1000;
 };
 #endif //OPCCLIENT_OPCCLIENT_H
