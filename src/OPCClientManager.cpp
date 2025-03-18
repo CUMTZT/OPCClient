@@ -4,16 +4,17 @@
 #include "OPCClientManager.h"
 #include <yaml-cpp/yaml.h>
 #include "Logger.h"
-#include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
 #include <QDateTime>
+#include <rapidjson/writer.h>
 
-std::optional<std::string> getExceptionPtrMsg(const std::exception_ptr& eptr) // passing by value is ok
-{
-    try {
-        if (eptr) {
+std::optional<std::string> getExceptionPtrMsg(const std::exception_ptr& eptr){
+    try{
+        if (eptr){
             std::rethrow_exception(eptr);
         }
-    } catch(const std::exception& e) {
+    }
+    catch (const std::exception& e){
         return e.what();
     }
     return {};
@@ -23,144 +24,75 @@ OPCClientManager* OPCClientManager::mpInstance = nullptr;
 
 std::recursive_mutex OPCClientManager::mMutex;
 
-OPCClientManager* OPCClientManager::getInstance()
-{
-    if (nullptr == mpInstance)
-    {
+OPCClientManager* OPCClientManager::getInstance(){
+    if (nullptr == mpInstance){
         std::scoped_lock lock(mMutex);
-        if (nullptr == mpInstance)
-        {
+        if (nullptr == mpInstance){
             mpInstance = new OPCClientManager();
         }
     }
     return mpInstance;
 }
 
-OPCClientManager::OPCClientManager() : QObject(nullptr)
-{
+OPCClientManager::OPCClientManager() : QObject(nullptr){
     mpKafkaProducer = new KafkaProducer();
     mpKafkaProducerThread = new QThread(this);
     mpKafkaProducer->moveToThread(mpKafkaProducerThread);
     mpKafkaProducerThread->start();
     mpHttpServer = new httplib::Server();
-    mpHttpServer->Get("/update", [this](const httplib::Request& req, httplib::Response& res)
-    {
-        std::string machine = req.get_param_value("machine");
-        std::string code = req.get_param_value("code");
-        std::string value = req.get_param_value("value");
-        try{
-            {
-                std::scoped_lock lock(mClientsMutex);
-                auto iter = mClients.find(machine);
-                if (iter == mClients.end())
-                {
-                    throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", machine));
-                }
-                auto client = iter->second;
-                client->setDataValue({code, value});
-            }
-            res.status = 200;
-            res.set_content("<p>指令上行成功<span style='color:green;'>%s</span></p>", "text/html");
-        }
-        catch (std::exception &e)
-        {
-            const char* fmt = fmt::format("<p>发送上行指令失败！原因：{}<span style='color:red;'>%s</span></p>",e.what()).c_str();
-            char buf[BUFSIZ];
-            snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
-            res.status = 500;
-            res.set_content(buf, "text/html");
-        }
-    });
-
-    mpHttpServer->set_exception_handler(
-        [](const httplib::Request& /*req*/, httplib::Response& res, const std::exception_ptr& ep)
-        {
-            std::optional<std::string> exceptionPtrMsg = getExceptionPtrMsg(ep);
-            if (!exceptionPtrMsg.has_value()){
-                return;
-            }
-            const char* fmt = fmt::format("<p>发送上行指令失败！原因：{}<span style='color:red;'>%s</span></p>",exceptionPtrMsg.value()).c_str();
-            char buf[BUFSIZ];
-            snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
-            res.status = 500;
-            res.set_content(buf, "text/html");
-        });
-
-    mpHttpServer->set_error_handler([](const httplib::Request& /*req*/, httplib::Response& res)
-    {
-        const char* fmt = fmt::format("<p>发送上行指令失败！原因：未知<span style='color:red;'>%s</span></p>").c_str();
-        char buf[BUFSIZ];
-        snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
-        res.status = 500;
-        res.set_content(buf, "text/html");
-    });
+    initHttpServer();
 }
 
-OPCClientManager::~OPCClientManager()
-{
-    for (auto& client : mClients)
-    {
+OPCClientManager::~OPCClientManager(){
+    for (auto& client : mClients){
         client.second->stop();
     }
 }
 
-void OPCClientManager::loadConfig(const std::string& configFile)
-{
+void OPCClientManager::loadConfig(const std::string& configFile){
     std::scoped_lock lock(mClientsMutex);
-    try
-    {
+    try{
         auto config = YAML::LoadFile(configFile);
-        if (config.IsNull() || !config["opc"])
-        {
+        if (config.IsNull() || !config["opc"]){
             LogErr("配置文件解析错误！");
             return;
         }
         mConfig = config["opc"];
-        if (mConfig["ascending_server_port"])
-        {
+        if (mConfig["ascending_server_port"]){
             auto port = mConfig["ascending_server_port"].as<int>();
             stopHttpServer();
-            mpHttpServerThread = new std::thread([=, this]()
-            {
+            mpHttpServerThread = new std::thread([=, this](){
                 LogInfo("HttpServer正在监听 : {}", port);
                 mpHttpServer->listen("localhost", port);
             });
         }
-        if (mConfig["clients"])
-        {
-            for (int i = 0; i < mConfig["clients"].size(); i++)
-            {
+        if (mConfig["clients"]){
+            for (int i = 0; i < mConfig["clients"].size(); i++){
                 auto clientConfig = mConfig["clients"][i];
-                if (!clientConfig["code"])
-                {
+                if (!clientConfig["code"]){
                     LogErr("配置文件中不存在OPC客户端ID！");
                     continue;
                 }
                 auto code = clientConfig["code"].as<std::string>();
-                if (!clientConfig["server"])
-                {
+                if (!clientConfig["server"]){
                     LogErr("配置文件中不存在OPC服务端URL！");
                     continue;
                 }
                 auto server = clientConfig["server"].as<std::string>();
-                if (!clientConfig["topic"])
-                {
+                if (!clientConfig["topic"]){
                     LogErr("配置文件中不存在要发送的Topic！");
                     continue;
                 }
                 auto topic = clientConfig["topic"].as<std::string>();
 
                 int interval = 1000;
-                if (clientConfig["interval"])
-                {
+                if (clientConfig["interval"]){
                     interval = clientConfig["interval"].as<int>();
-                    if (interval < 1)
-                    {
+                    if (interval < 1){
                         interval = 1000;
                     }
                 }
-                else
-                {
+                else{
                     LogWarn("配置文件中不存在采集间隔时间，使用默认值1000ms！");
                 }
 
@@ -172,55 +104,125 @@ void OPCClientManager::loadConfig(const std::string& configFile)
                 connect(client.get(), &OPCClient::newData, mpKafkaProducer, &KafkaProducer::onNewDatas);
                 client->start();
 
-                if (clientConfig["nodes_config"])
-                {
+                if (clientConfig["nodes_config"]){
                     auto node_config_path = clientConfig["nodes_config"].as<std::string>();
-                    try
-                    {
+                    try{
                         auto nodeConfig = YAML::LoadFile(node_config_path);
-                        if (nodeConfig.IsNull())
-                        {
+                        if (nodeConfig.IsNull()){
                             continue;
                         }
                         std::string node_code;
-                        for (auto && j : nodeConfig)
-                        {
+                        for (auto&& j : nodeConfig){
                             node_code = j.as<std::string>();
                             client->addNode(node_code);
                         }
                     }
-                    catch (YAML::Exception& e)
-                    {
+                    catch (YAML::Exception& e){
                         LogErr("{}", e.msg);
                     }
                 }
-                else
-                {
+                else{
                     LogWarn("OPCClient配置中不存在nodes节点!");
                 }
                 client->start();
                 mClients.emplace(code, client);
             }
         }
-        else
-        {
+        else{
             LogWarn("配置文件中不存在OPC客户端配置！");
         }
         mpKafkaProducer->loadConfig(configFile);
     }
-    catch (const YAML::Exception& e)
-    {
+    catch (const YAML::Exception& e){
         LogErr("{}", e.msg);
     }
 }
 
-void OPCClientManager::stopHttpServer()
-{
-    if (mpHttpServer->is_running())
-    {
+void OPCClientManager::stopHttpServer(){
+    if (mpHttpServer->is_running()){
         mpHttpServer->stop();
         mpHttpServerThread->join();
         delete mpHttpServerThread;
         mpHttpServerThread = nullptr;
     }
+}
+
+void OPCClientManager::initHttpServer(){
+    mpHttpServer->Get("/update", [this](const httplib::Request& req, httplib::Response& res){
+        std::string machine = req.get_param_value("machine");
+        std::string code = req.get_param_value("code");
+        std::string value = req.get_param_value("value");
+        std::scoped_lock lock(mClientsMutex);
+        auto iter = mClients.find(machine);
+        if (iter == mClients.end()){
+            throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", machine));
+        }
+        auto client = iter->second;
+        client->setDataValue({code, value});
+        rapidjson::StringBuffer sb;
+        rapidjson::Writer writer(sb);
+        writer.StartObject();
+        writer.Key("result");
+        writer.String(fmt::format("指令[machine:{}, code:{}, value:{}]发送成功", machine, code, value).c_str());
+        writer.EndObject();
+        res.status = 200;
+        res.set_content(sb.GetString(), "text/plain");
+    });
+
+    mpHttpServer->Get("/search", [this](const httplib::Request& req, httplib::Response& res){
+        std::string machine = req.get_param_value("machine");
+        std::string type = req.get_param_value("type");
+        if ("nodes" == type)
+        {
+            std::scoped_lock lock(mClientsMutex);
+            auto iter = mClients.find(machine);
+            if (iter == mClients.end()){
+                throw std::runtime_error(fmt::format("获取机器[machine:{}]采集节点没有找到对应客户端", machine));
+            }
+            auto client = iter->second;
+            rapidjson::StringBuffer sb;
+            rapidjson::Writer writer(sb);
+            writer.StartObject();
+            writer.Key("result");
+            writer.StartArray();
+            std::set<std::string> nodes = client->nodes();
+            for (auto&& node : nodes){
+                writer.String(node.c_str());
+            }
+            writer.EndArray();
+            writer.EndObject();
+            res.status = 200;
+            res.set_content(sb.GetString(), "text/plain");
+        }
+        else{
+            throw std::runtime_error(fmt::format("查询机器{}订阅节点失败",machine));
+        }
+    });
+
+    mpHttpServer->set_exception_handler([](const httplib::Request& req, httplib::Response& res, const std::exception_ptr& ep){
+        std::string machine = req.get_param_value("machine");
+        std::string code = req.get_param_value("code");
+        std::string value = req.get_param_value("value");
+        std::optional<std::string> exceptionPtrMsg = getExceptionPtrMsg(ep);
+        if (!exceptionPtrMsg.has_value()){
+            return;
+        }
+        const char* fmt = fmt::format("{{发送指令[machine:{}, code:{}, value:{}] 失败：{}}}", machine, code, value,
+                                      exceptionPtrMsg.value()).c_str();
+        char buf[BUFSIZ];
+        snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
+        res.status = 500;
+        res.set_content(buf, "text/plain");
+    });
+
+    mpHttpServer->set_error_handler([](const httplib::Request& req, httplib::Response& res){
+        std::string machine = req.get_param_value("machine");
+        std::string code = req.get_param_value("code");
+        std::string value = req.get_param_value("value");
+        const char* fmt = fmt::format("{{发送指令[machine:{}, code:{}, value:{}]失败:{}}}", machine, code, value,"服务器错误！").c_str();
+        char buf[BUFSIZ];
+        snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
+        res.status = 500;
+        res.set_content(buf, "text/plain");
+    });
 }

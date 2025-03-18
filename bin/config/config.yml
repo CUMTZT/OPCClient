@@ -13,10 +13,10 @@ opc:
   ascending_server_port: 1234
   clients:
     -
-      code: no1_machine
+      code: no1:machine
       server: opc.tcp://localhost:4840
       topic: electric_trace_test
-      interval: 1000
+      interval: 3000
       nodes_config: ./config/no1_machine_nodes.yml
 
 

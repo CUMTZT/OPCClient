@@ -27,6 +27,8 @@ private:
 
     OPCClientManager();
 
+    void initHttpServer();
+
     void stopHttpServer();
 
     static OPCClientManager* mpInstance;
