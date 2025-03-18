@@ -26,7 +26,6 @@ bool string_to_bool(const std::string &s) {
     std::string trimmed = trim(s);
     std::transform(trimmed.begin(), trimmed.end(), trimmed.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-
     if (trimmed == "true" || trimmed == "1") {
         return true;
     }
@@ -118,12 +117,12 @@ void OPCClient::setDataValue(const Data &data) {
             LogErr("客户端没有连接，发送失败！");
             return;
         }
-        std::scoped_lock lock(mClientLocker);
         std::string nodeCode = data.first;
         std::string value = data.second;
-        uint32_t index = nodeCode.find_first_of('_');
+        uint32_t index = nodeCode.find_first_of(':');
         std::string first = nodeCode.substr(0, index);
         std::string second = nodeCode.substr(index + 1);
+        std::scoped_lock lock(mClientLocker);
         opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
         auto oldUaVar = uaNode.readValue();
         uint32_t type = oldUaVar.type()->typeKind;
@@ -172,7 +171,7 @@ void OPCClient::run() {
                 for (auto node: mNodes) {
                     std::pair<std::string, std::string> data;
                     std::string type;
-                    std::size_t index = node.find_first_of('_');
+                    std::size_t index = node.find_first_of(':');
                     if (index == std::string::npos) {
                         continue;
                     }
@@ -212,10 +211,10 @@ void OPCClient::run() {
                         type = "string";
                         data.second = uaValue.to<std::string>();
                     } else {
-                        LogErr("Read Unsupported Data Type: {}!", type);
+                        LogErr("不支持的数据类型: {}!", type);
                         continue;
                     }
-                    LogInfo("Successful Read Data,ID:{} Name:{} Type:{} Value:{}", node, browseName, type, data.second);
+                    LogInfo("成功读取到数据,ID:[{}] Name:{} Type:{} Value:{}", node, browseName, type, data.second);
                     datas.emplace_back(data);
                 }
                 if (!datas.empty()) {

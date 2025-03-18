@@ -49,14 +49,16 @@ OPCClientManager::OPCClientManager() : QObject(nullptr)
         std::string code = req.get_param_value("code");
         std::string value = req.get_param_value("value");
         try{
-            std::scoped_lock lock(mMutex);
-            auto iter = mClients.find(machine);
-            if (iter == mClients.end())
             {
-                throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", machine));
+                std::scoped_lock lock(mClientsMutex);
+                auto iter = mClients.find(machine);
+                if (iter == mClients.end())
+                {
+                    throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", machine));
+                }
+                auto client = iter->second;
+                client->setDataValue({code, value});
             }
-            auto client = iter->second;
-            client->setDataValue({code, value});
             res.status = 200;
             res.set_content("<p>指令上行成功<span style='color:green;'>%s</span></p>", "text/html");
         }
@@ -91,13 +93,6 @@ OPCClientManager::OPCClientManager() : QObject(nullptr)
         snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
         res.status = 500;
         res.set_content(buf, "text/html");
-    });
-    mpHttpServerThread = new std::thread([=, this]()
-    {
-        if (mpHttpServer->listen("localhost", 1234))
-        {
-            LogInfo("指令上行Http服务正在监听端口：{}", 1234);
-        }
     });
 }
 
@@ -188,21 +183,10 @@ void OPCClientManager::loadConfig(const std::string& configFile)
                             continue;
                         }
                         std::string node_code;
-                        for (int j = 0; j < nodeConfig.size(); j++)
+                        for (auto && j : nodeConfig)
                         {
-                            if (!nodeConfig[j]["code"])
-                            {
-                                LogErr("配置文件中不存在code！");
-                                continue;
-                            }
-                            node_code = nodeConfig[j]["code"].as<std::string>();
+                            node_code = j.as<std::string>();
                             client->addNode(node_code);
-                            if (!nodeConfig[j]["name"])
-                            {
-                                LogErr("配置文件中不存在name！");
-                                continue;
-                            }
-                            auto node_name = nodeConfig[j]["name"].as<std::string>();
                         }
                     }
                     catch (YAML::Exception& e)

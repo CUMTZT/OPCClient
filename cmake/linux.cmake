@@ -26,8 +26,6 @@ add_executable(OPCClient
         src/KafkaProducer.cpp
         include/OPCClientManager.h
         src/OPCClientManager.cpp
-        include/AscendingMessageHandler.h
-        src/AscendingMessageHandler.cpp
 )
 
 target_link_libraries(OPCClient
