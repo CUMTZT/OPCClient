@@ -12,8 +12,6 @@
 #include <QThread>
 #include "Exception.h"
 
-DECLARE_EXCEPTION(OPCClientException, Exception)
-
 class OPCClient : public QThread {
     Q_OBJECT
 

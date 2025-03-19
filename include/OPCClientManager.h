@@ -7,6 +7,10 @@
 #include "OPCClient.h"
 #include "KafkaProducer.h"
 #include "cpp-httplib/httplib.h"
+
+DECLARE_EXCEPTION(OPCClientNotExistException, ExistsException)
+DECLARE_EXCEPTION(HttpRuntimeError, RuntimeException)
+
 class OPCClientManager : public QObject {
     Q_OBJECT
 
@@ -31,6 +35,8 @@ private:
 
     void stopHttpServer();
 
+    std::string generateResponseContent(const std::string &message,int code);
+
     static OPCClientManager* mpInstance;
 
     static std::recursive_mutex mMutex;
@@ -51,4 +57,5 @@ private:
 };
 
 #define OPCClientManagerIns OPCClientManager::getInstance()
+
 #endif //OPCCLIENTMANAGER_H

@@ -9,17 +9,8 @@
 #include <rapidjson/writer.h>
 #include "Exception.h"
 
-std::optional<std::string> getExceptionPtrMsg(const std::exception_ptr& eptr){
-    try{
-        if (eptr){
-            std::rethrow_exception(eptr);
-        }
-    }
-    catch (const std::exception& e){
-        return e.what();
-    }
-    return {};
-}
+IMPLEMENT_EXCEPTION(OPCClientNotExistException, ExistsException, "OPC客户端不存在")
+IMPLEMENT_EXCEPTION(HttpRuntimeError, RuntimeException, "Http响应时出错")
 
 OPCClientManager* OPCClientManager::mpInstance = nullptr;
 
@@ -148,6 +139,18 @@ void OPCClientManager::stopHttpServer(){
     }
 }
 
+std::string OPCClientManager::generateResponseContent(const std::string &message,int code){
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer writer(sb);
+    writer.StartObject();
+    writer.Key("code");
+    writer.Int(code);
+    writer.Key("message");
+    writer.String(message.c_str());
+    writer.EndObject();
+    return sb.GetString();
+}
+
 void OPCClientManager::initHttpServer(){
     mpHttpServer->Get("/update", [this](const httplib::Request& req, httplib::Response& res){
         try {
@@ -157,19 +160,13 @@ void OPCClientManager::initHttpServer(){
             std::scoped_lock lock(mClientsMutex);
             auto iter = mClients.find(machine);
             if (iter == mClients.end()){
-                HttpUpdateNodeValueException exception(fmt::format("上行指令没有找到对应客户端：{}", machine));
+                OPCClientNotExistException exception(fmt::format("OPC客户端[{}]不存在", machine));
                 exception.rethrow();
             }
             auto client = iter->second;
             client->setDataValue({code, value});
-            rapidjson::StringBuffer sb;
-            rapidjson::Writer writer(sb);
-            writer.StartObject();
-            writer.Key("result");
-            writer.String(fmt::format("指令[machine:{}, code:{}, value:{}]发送成功", machine, code, value).c_str());
-            writer.EndObject();
-            res.status = 200;
-            res.set_content(sb.GetString(), "text/plain");
+            auto result= generateResponseContent(fmt::format("{{发送指令[machine:{}, code:{}, value:{}]成功}}", machine, code, value),200);
+            res.set_content(result, "application/json");
         }
         catch (...) {
             std::rethrow_exception(std::current_exception());
@@ -198,28 +195,25 @@ void OPCClientManager::initHttpServer(){
             }
             writer.EndArray();
             writer.EndObject();
-            res.status = 200;
-            res.set_content(sb.GetString(), "text/plain");
+            res.set_content(sb.GetString(), "application/json");
         }
         else{
             throw std::runtime_error(fmt::format("查询机器{}订阅节点失败",machine));
         }
     });
 
-    mpHttpServer->set_exception_handler([](const httplib::Request& req, httplib::Response& res, const std::exception_ptr& ep){
-        std::string machine = req.get_param_value("machine");
-        std::string code = req.get_param_value("code");
-        std::string value = req.get_param_value("value");
-        std::optional<std::string> exceptionPtrMsg = getExceptionPtrMsg(ep);
-        if (!exceptionPtrMsg.has_value()){
-            return;
+    mpHttpServer->set_exception_handler([this](const httplib::Request& req, httplib::Response& res, const std::exception_ptr& ep){
+        std::string result;
+        try{
+            std::rethrow_exception(ep);
         }
-        const char* fmt = fmt::format("{{发送指令[machine:{}, code:{}, value:{}] 失败：{}}}", machine, code, value,
-                                      exceptionPtrMsg.value()).c_str();
-        char buf[BUFSIZ];
-        snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
-        res.status = 500;
-        res.set_content(buf, "text/plain");
+        catch (OPCClientNotExistException& e){
+            result= generateResponseContent(e.message(),500);
+        }
+        catch (HttpRuntimeError& e){
+            result= generateResponseContent(e.message(),500);
+        }
+         res.set_content(result.c_str(), "application/json");
     });
 
     mpHttpServer->set_error_handler([](const httplib::Request& req, httplib::Response& res){
@@ -229,7 +223,6 @@ void OPCClientManager::initHttpServer(){
         const char* fmt = fmt::format("{{发送指令[machine:{}, code:{}, value:{}]失败:{}}}", machine, code, value,"服务器错误！").c_str();
         char buf[BUFSIZ];
         snprintf(buf, sizeof(buf), fmt, std::strerror(errno));
-        res.status = 500;
-        res.set_content(buf, "text/plain");
+        res.set_content(buf, "application/json");
     });
 }

@@ -35,8 +35,9 @@ add_executable(OPCClient
         src/KafkaProducer.cpp
         include/OPCClientManager.h
         src/OPCClientManager.cpp
-        ../include/Exception.h
-        ../include/GlobalDefine.h
+        include/Exception.h
+        src/Exception.cpp
+        include/GlobalDefine.h
 )
 
 target_link_libraries(OPCClient
