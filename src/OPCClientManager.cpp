@@ -7,6 +7,7 @@
 #include "rapidjson/stringbuffer.h"
 #include <QDateTime>
 #include <rapidjson/writer.h>
+#include "Exception.h"
 
 std::optional<std::string> getExceptionPtrMsg(const std::exception_ptr& eptr){
     try{
@@ -149,24 +150,30 @@ void OPCClientManager::stopHttpServer(){
 
 void OPCClientManager::initHttpServer(){
     mpHttpServer->Get("/update", [this](const httplib::Request& req, httplib::Response& res){
-        std::string machine = req.get_param_value("machine");
-        std::string code = req.get_param_value("code");
-        std::string value = req.get_param_value("value");
-        std::scoped_lock lock(mClientsMutex);
-        auto iter = mClients.find(machine);
-        if (iter == mClients.end()){
-            throw std::runtime_error(fmt::format("上行指令没有找到对应客户端：{}", machine));
+        try {
+            std::string machine = req.get_param_value("machine");
+            std::string code = req.get_param_value("code");
+            std::string value = req.get_param_value("value");
+            std::scoped_lock lock(mClientsMutex);
+            auto iter = mClients.find(machine);
+            if (iter == mClients.end()){
+                HttpUpdateNodeValueException exception(fmt::format("上行指令没有找到对应客户端：{}", machine));
+                exception.rethrow();
+            }
+            auto client = iter->second;
+            client->setDataValue({code, value});
+            rapidjson::StringBuffer sb;
+            rapidjson::Writer writer(sb);
+            writer.StartObject();
+            writer.Key("result");
+            writer.String(fmt::format("指令[machine:{}, code:{}, value:{}]发送成功", machine, code, value).c_str());
+            writer.EndObject();
+            res.status = 200;
+            res.set_content(sb.GetString(), "text/plain");
         }
-        auto client = iter->second;
-        client->setDataValue({code, value});
-        rapidjson::StringBuffer sb;
-        rapidjson::Writer writer(sb);
-        writer.StartObject();
-        writer.Key("result");
-        writer.String(fmt::format("指令[machine:{}, code:{}, value:{}]发送成功", machine, code, value).c_str());
-        writer.EndObject();
-        res.status = 200;
-        res.set_content(sb.GetString(), "text/plain");
+        catch (...) {
+            std::rethrow_exception(std::current_exception());
+        }
     });
 
     mpHttpServer->Get("/search", [this](const httplib::Request& req, httplib::Response& res){

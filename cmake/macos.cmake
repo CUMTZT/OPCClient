@@ -36,7 +36,6 @@ add_executable(OPCClient
         include/OPCClientManager.h
         src/OPCClientManager.cpp
         ../include/Exception.h
-        ../src/Exception.cpp
         ../include/GlobalDefine.h
 )
 

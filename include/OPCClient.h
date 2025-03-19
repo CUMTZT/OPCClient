@@ -10,6 +10,9 @@
 #include <yaml-cpp/node/convert.h>
 #include <QTimer>
 #include <QThread>
+#include "Exception.h"
+
+DECLARE_EXCEPTION(OPCClientException, Exception)
 
 class OPCClient : public QThread {
     Q_OBJECT
