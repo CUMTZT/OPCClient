@@ -12,6 +12,10 @@
 #include <QThread>
 #include "Exception.h"
 
+DECLARE_EXCEPTION(OPCClientNotConnectException,RuntimeException)
+DECLARE_EXCEPTION(OPCNodeNotExistException,RuntimeException)
+DECLARE_EXCEPTION(OPCNodeTypeNotSupportException,RuntimeException)
+
 class OPCClient : public QThread {
     Q_OBJECT
 

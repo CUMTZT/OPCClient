@@ -13,6 +13,10 @@
 #include <QTimer>
 #include <mutex>
 
+IMPLEMENT_EXCEPTION(OPCClientNotConnectException,RuntimeException,"OPCClient未连接")
+IMPLEMENT_EXCEPTION(OPCNodeNotExistException,RuntimeException,"OPC节点不存在")
+IMPLEMENT_EXCEPTION(OPCNodeTypeNotSupportException,RuntimeException,"OPC节点格式不被支持")
+
 // 辅助函数：去除字符串两端的空白字符
 std::string trim(const std::string& s)
 {
@@ -132,12 +136,10 @@ void OPCClient::stop()
 
 void OPCClient::setDataValue(const Data& data)
 {
-    try
-    {
-        if (!isConnected())
-        {
-            LogErr("客户端没有连接，发送失败！");
-            return;
+    try{
+        if (!isConnected()){
+            OPCClientNotConnectException e(fmt::format("客户端没有连接，指令[{},{}]上行失败！",data.first,data.second));
+            e.rethrow();
         }
         std::string nodeCode = data.first;
         std::string value = data.second;
@@ -149,7 +151,8 @@ void OPCClient::setDataValue(const Data& data)
         auto oldUaVar = uaNode.readValue();
         uint32_t typeKind = oldUaVar.type()->typeKind;
         if (!uaNode.exists()){
-            throw std::runtime_error(fmt::format("节点{}不存在，写入失败！", nodeCode));
+            OPCNodeNotExistException e(fmt::format("OPC节点[{}]不存在",nodeCode));
+            e.rethrow();
         }
         switch (typeKind)
         {
@@ -189,8 +192,9 @@ void OPCClient::setDataValue(const Data& data)
         case UA_DATATYPEKIND_STRING:
             uaNode.writeValueScalar<std::string>(value);
             break;
-        default:
-            throw std::runtime_error(fmt::format("节点：{}数据类型不支持写入,写入失败！",nodeCode));
+            default:
+            OPCNodeTypeNotSupportException e(fmt::format("OPC节点[{}]类型[{}]不被支持",nodeCode,typeKind));
+            e.rethrow();
         }
     }
     catch (...)

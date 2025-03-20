@@ -207,11 +207,11 @@ void OPCClientManager::initHttpServer(){
         try{
             std::rethrow_exception(ep);
         }
-        catch (OPCClientNotExistException& e){
+        catch (Exception& e){
             result= generateResponseContent(e.message(),500);
         }
-        catch (HttpRuntimeError& e){
-            result= generateResponseContent(e.message(),500);
+        catch (std::exception& e) {
+            result= generateResponseContent(e.what(),500);
         }
          res.set_content(result.c_str(), "application/json");
     });
