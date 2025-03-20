@@ -26,15 +26,15 @@ link_directories(
 message("${DEPENDENCY_PATH}/lib")
 
 add_executable(OPCClient
-        include/OPCClient.h
         src/main.cpp
-        src/OPCClient.cpp
+        include/Machine.h
+        src/Machine.cpp
         include/Logger.h
         src/Logger.cpp
         include/KafkaProducer.h
         src/KafkaProducer.cpp
-        include/OPCClientManager.h
-        src/OPCClientManager.cpp
+        include/OPCClient.h
+        src/OPCClient.cpp
         include/Exception.h
         src/Exception.cpp
         include/GlobalDefine.h

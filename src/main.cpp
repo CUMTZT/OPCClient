@@ -5,7 +5,7 @@
 #include <QCoreApplication>
 #include "KafkaProducer.h"
 #include "Logger.h"
-#include "OPCClientManager.h"
+#include "OPCClient.h"
 #include <yaml-cpp/yaml.h>
 #include "QDir"
 

@@ -1,82 +1,66 @@
 //
-// Created by cumtzt on 25-1-20.
+// Created by cumtzt on 25-2-24.
 //
 
-#ifndef OPCCLIENT_OPCCLIENT_H
-#define OPCCLIENT_OPCCLIENT_H
-
-#include <open62541pp/open62541pp.hpp>
-#include "GlobalDefine.h"
-#include <yaml-cpp/node/convert.h>
-#include <QTimer>
-#include <QThread>
+#ifndef OPCCLIENTMANAGER_H
+#define OPCCLIENTMANAGER_H
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/writer.h>
 #include "Exception.h"
+#include "OPCClient.h"
+#include "KafkaProducer.h"
+#include "cpp-httplib/httplib.h"
+#include "Machine.h"
 
-DECLARE_EXCEPTION(OPCClientNotConnectException,RuntimeException)
-DECLARE_EXCEPTION(OPCNodeNotExistException,RuntimeException)
-DECLARE_EXCEPTION(OPCNodeTypeNotSupportException,RuntimeException)
+DECLARE_EXCEPTION(OPCClientNotExistException, ExistsException)
+DECLARE_EXCEPTION(HttpRuntimeError, RuntimeException)
+DECLARE_EXCEPTION(HttpUnsupportedSearchType, HttpRuntimeError)
 
-class OPCClient : public QThread {
+class OPCClient : public QObject {
     Q_OBJECT
 
 public:
-    explicit OPCClient(QObject *parent = nullptr);
+    static OPCClient* getInstance();
+
+    OPCClient(OPCClient const &) = delete;
+
+    OPCClient(OPCClient &&) = delete;
+
+    OPCClient &operator=(OPCClient const &) = delete;
 
     ~OPCClient() override;
 
-    void setCode(const std::string& code);
-
-    std::string code();
-
-    void setUrl(const std::string &url);
-
-    [[nodiscard]] std::string url() const;
-
-    void addNode(const std::string &node);
-
-    std::set<std::string> nodes();
-
-    void setTopic(const std::string& topic);
-
-    std::string topic();
-
-    void setInterval(int interval);
-
-    int interval();
-
-    void start();
-
-    void stop();
-
-    void setDataValue(const Data& data);
-
-signals:
-    void newData(const std::string& topic,const std::string& code, const DataList& datas);
-
-private slots:
-
-    void connectServer();
+    void loadConfig(const std::string &configFile);
 
 private:
 
-    void run() override;
+    OPCClient();
 
-    bool isConnected();
+    void initHttpServer();
 
-    std::string mUrl;
+    void stopHttpServer();
 
-    std::string mCode;
+    std::string generateResponseContent(int code, const std::string &message, const std::string& data = "");
 
-    std::string mTopic;
+    static OPCClient* mpInstance;
 
-    std::unique_ptr<opcua::Client> mpClient = nullptr;
+    static std::recursive_mutex mMutex;
 
-    std::mutex mClientLocker;
+    std::unordered_map<std::string,std::shared_ptr<Machine>>mClients;
 
-    std::set<std::string> mNodes;
+    std::recursive_mutex mClientsMutex;
 
-    QTimer* mpReconnectTimer = nullptr;
+    KafkaProducer* mpKafkaProducer = nullptr;
 
-    std::atomic<int> mInterval = 1000;
+    QThread* mpKafkaProducerThread = nullptr;
+
+    YAML::Node mConfig;
+
+    httplib::Server* mpHttpServer = nullptr;
+
+    std::thread* mpHttpServerThread = nullptr;
 };
-#endif //OPCCLIENT_OPCCLIENT_H
+
+#define OPCClientManagerIns OPCClient::getInstance()
+
+#endif //OPCCLIENTMANAGER_H
