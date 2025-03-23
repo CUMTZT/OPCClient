@@ -6,6 +6,6 @@
 #define GLOBALDEFINE_H
 #include <list>
 #include <string>
-typedef std::pair<std::string, std::string> Data;
-typedef std::list<Data> DataList;
+//typedef std::pair<std::string, std::string> Data;
+//typedef std::list<Data> DataList;
 #endif //GLOBALDEFINE_H

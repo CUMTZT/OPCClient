@@ -13,7 +13,8 @@
 #include <QTimer>
 #include <mutex>
 
-IMPLEMENT_EXCEPTION(MachineNotConnectException, RuntimeException, "机器未连接")//TODO
+IMPLEMENT_EXCEPTION(OPCServerNotConnectException, RuntimeException, "未连接到OPC服务")
+IMPLEMENT_EXCEPTION(OPCNodeCodeFormatErrorException, RuntimeException, "OPC节点Code格式解析错误")
 IMPLEMENT_EXCEPTION(OPCNodeNotExistException, RuntimeException, "OPC节点不存在")
 IMPLEMENT_EXCEPTION(OPCNodeTypeNotSupportException, RuntimeException, "OPC节点格式不被支持")
 
@@ -150,7 +151,7 @@ void Machine::setNodeValue(const std::string& nodeCode, const std::string& value
     {
         if (!isConnected())
         {
-            OPCClientNotConnectException e(fmt::format("客户端没有连接，指令[{},{}]上行失败！", nodeCode, value));
+            OPCServerNotConnectException e(fmt::format("没有连接到OPC服务[{}]，指令[{},{}]上行失败！",mMachineCode, nodeCode, value));
             e.rethrow();
         }
         uint32_t index = nodeCode.find_first_of(':');
@@ -162,7 +163,7 @@ void Machine::setNodeValue(const std::string& nodeCode, const std::string& value
         uint32_t typeKind = oldUaVar.type()->typeKind;
         if (!uaNode.exists())
         {
-            OPCNodeNotExistException e(fmt::format("OPC节点[{}]不存在", nodeCode));
+            OPCNodeNotExistException e(fmt::format("OPC服务[{}]节点[{}]不存在",mMachineCode, nodeCode));
             e.rethrow();
         }
         switch (typeKind)
@@ -204,7 +205,7 @@ void Machine::setNodeValue(const std::string& nodeCode, const std::string& value
             uaNode.writeValueScalar<std::string>(value);
             break;
         default:
-            OPCNodeTypeNotSupportException e(fmt::format("OPC节点[{}]类型[{}]不被支持", nodeCode, typeKind));
+            OPCNodeTypeNotSupportException e(fmt::format("OPC服务[{}]节点[{}]类型[{}]不被支持",mMachineCode, nodeCode, typeKind));
             e.rethrow();
         }
     }
@@ -214,30 +215,32 @@ void Machine::setNodeValue(const std::string& nodeCode, const std::string& value
     }
 }
 
-std::string Machine::getNodeValue(const std::string& nodeCode)
+void Machine::getNode(const std::string& nodeCode,std::string& name,std::string& type,std::string& value)
 {
     try
     {
         if (!isConnected())
         {
-            OPCClientNotConnectException e(fmt::format("客户端没有连接，获取节点[{}]数据失败！", nodeCode));
+            OPCServerNotConnectException e(fmt::format("没有连接到服务[{}]，获取节点[{}]数据失败！",mMachineCode, nodeCode));
             e.rethrow();
         }
         uint32_t index = nodeCode.find_first_of(':');
+        if (index == std::string::npos){
+            OPCNodeCodeFormatErrorException e("解析NodeCode[{}],失败",nodeCode);
+            e.rethrow();
+        }
         std::string first = nodeCode.substr(0, index);
         std::string second = nodeCode.substr(index + 1);
         std::scoped_lock lock(mClientLocker);
         opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
         if (!uaNode.exists())
         {
-            OPCNodeNotExistException e(fmt::format("OPC节点[{}]不存在", nodeCode));
+            OPCNodeNotExistException e(fmt::format("OPC服务[{}]节点[{}]不存在",mMachineCode, nodeCode));
             e.rethrow();
         }
         auto uaValue = uaNode.readValue();
-        uint32_t typeKind = uaValue.type()->typeKind;
-        std::string value;
-        std::string type;
-        switch (typeKind)
+        name = uaNode.readBrowseName().name();
+        switch (uint32_t typeKind = uaValue.type()->typeKind)
         {
         case UA_DATATYPEKIND_BOOLEAN:
             value = uaValue.to<bool>() ? "1" : "0";
@@ -323,97 +326,20 @@ void Machine::run()
     {
         try
         {
-            DataList datas;
+            std::vector<std::pair<std::string,std::string>> datas;
+            datas.reserve(mNodeCodes.size());
             for (auto node : mNodeCodes)
             {
-                std::pair<std::string, std::string> data;
                 std::string type;
-                std::size_t index = node.find_first_of(':');
-                if (index == std::string::npos)
-                {
-                    LogErr("节点code ：{}解析失败！", node);
-                    continue;
-                }
-                std::string first = node.substr(0, index);
-                std::string second = node.substr(index + 1);
-                opcua::Variant uaValue;
+                std::string value;
                 std::string browseName;
-                uint32_t typeKind;
-                {
-                    std::scoped_lock lock(mClientLocker);
-                    try
-                    {
-                        opcua::Node uaNode(*mpClient, opcua::NodeId(stoi(first), stoi(second)));
-                        uaValue = uaNode.readValue();
-                        typeKind = uaValue.type()->typeKind;
-                        browseName = std::string(uaNode.readBrowseName().name());
-                    }
-                    catch (std::exception& e)
-                    {
-                        LogErr("读取节点：{}出错：{}", node, e.what());
-                        continue;
-                    }
+                try{
+                    getNode(node, browseName, type,value);
+                    datas.emplace_back(node, value);
+                    LogInfo("成功读取到数据,ID:[{}] Name:{} Type:{} Value:{}", node, browseName, type, value);
                 }
-                data.first = node;
-
-                switch (typeKind)
-                {
-                case UA_DATATYPEKIND_BOOLEAN:
-                    type = "bool";
-                    data.second = uaValue.to<bool>() ? "1" : "0";
-                    break;
-                case UA_DATATYPEKIND_SBYTE:
-                    type = "int8_t";
-                    data.second = QString::number(uaValue.to<int8_t>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_BYTE:
-                    type = "uint8_t";
-                    data.second = QString::number(uaValue.to<uint8_t>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_INT16:
-                    type = "int16_t";
-                    data.second = QString::number(uaValue.to<int16_t>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_UINT16:
-                    type = "uint16_t";
-                    data.second = QString::number(uaValue.to<uint16_t>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_INT32:
-                    type = "int32_t";
-                    data.second = QString::number(uaValue.to<int>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_UINT32:
-                    type = "uint32_t";
-                    data.second = QString::number(uaValue.to<uint32_t>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_INT64:
-                    type = "int64_t";
-                    data.second = QString::number(uaValue.to<int64_t>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_UINT64:
-                    type = "uint64_t";
-                    data.second = QString::number(uaValue.to<uint64_t>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_FLOAT:
-                    type = "float";
-                    data.second = QString::number(uaValue.to<float>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_DOUBLE:
-                    type = "double";
-                    data.second = QString::number(uaValue.to<double>()).toStdString();
-                    break;
-                case UA_DATATYPEKIND_STRING:
-                    type = "string";
-                    data.second = uaValue.to<std::string>();
-                    break;
-                default:
-                    LogErr("不支持的数据类型: {}!", typeKind);
-                    break;
-                }
-                if (!type.empty())
-                {
-                    LogInfo("成功读取到数据,ID:[{}] Name:{} Type:{} Value:{}", node, browseName, type, data.second);
-                    datas.emplace_back(data);
+                catch (Exception& e){
+                    LogErr("{}", e.message());
                 }
             }
             if (!datas.empty())

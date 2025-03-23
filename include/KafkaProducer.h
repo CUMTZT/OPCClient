@@ -18,7 +18,7 @@ public:
 
 public slots:
 
-    void onNewDatas(const std::string& topic, const std::string& code, const DataList& datas);
+    void onNewDatas(const std::string& topic, const std::string& code, const std::vector<std::pair<std::string,std::string>>& datas);
 
 private:
 

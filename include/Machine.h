@@ -12,7 +12,8 @@
 #include <QThread>
 #include "Exception.h"
 
-DECLARE_EXCEPTION(OPCClientNotConnectException,RuntimeException)
+DECLARE_EXCEPTION(OPCServerNotConnectException,RuntimeException)
+DECLARE_EXCEPTION(OPCNodeCodeFormatErrorException, RuntimeException)
 DECLARE_EXCEPTION(OPCNodeNotExistException,RuntimeException)
 DECLARE_EXCEPTION(OPCNodeTypeNotSupportException,RuntimeException)
 
@@ -52,10 +53,10 @@ public:
 
     void setNodeValue(const std::string& nodeCode,const std::string& value);
 
-    std::string getNodeValue(const std::string &nodeCode);
+    void getNode(const std::string &nodeCode,std::string& name,std::string& type,std::string& value);
 
 signals:
-    void newData(const std::string& topic,const std::string& code, const DataList& datas);
+    void newData(const std::string& topic,const std::string& code, const std::vector<std::pair<std::string,std::string>>& datas);
 
 private slots:
 

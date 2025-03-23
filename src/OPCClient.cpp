@@ -199,7 +199,7 @@ void OPCClient::initHttpServer()
                 exception.rethrow();
             }
             auto client = iter->second;
-            client->setNodeValue({code, value});
+            client->setNodeValue(code, value);
             auto result = generateResponseContent(
                 200, fmt::format("{{发送指令[machine:{}, code:{}, value:{}]成功}}", machine, code, value));
             res.set_content(result, "application/json");
@@ -285,7 +285,7 @@ void OPCClient::initHttpServer()
             res.set_content(generateResponseContent(200, fmt::format("OPC节点[{}]查询成功", machine), sb.GetString()),
                             "application/json");
         }
-        if ("node" == type)
+        else if ("node" == type)
         {
             std::string code = req.get_param_value("code");
             std::scoped_lock lock(mClientsMutex);
@@ -305,7 +305,21 @@ void OPCClient::initHttpServer()
                 writer.String(node.c_str());
             }
             writer.EndArray();
-            res.set_content(generateResponseContent(200, fmt::format("OPC节点[{}]查询成功", machine), sb.GetString()),
+            res.set_content(generateResponseContent(200, fmt::format("OPC客户端[{}]节点[{}]查询成功", machine,code), sb.GetString()),
+                            "application/json");
+        }
+        else if ("url" == type)
+        {
+            std::scoped_lock lock(mClientsMutex);
+            auto iter = mClients.find(machine);
+            if (iter == mClients.end())
+            {
+                OPCClientNotExistException exception(fmt::format("OPC客户端[{}]不存在", machine));
+                exception.rethrow();
+            }
+            auto client = iter->second;
+            auto url = client->url();
+            res.set_content(generateResponseContent(200, fmt::format("OPC客户端[{}]URL查询成功", machine), url),
                             "application/json");
         }
         else

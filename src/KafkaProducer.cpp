@@ -33,7 +33,7 @@ void KafkaProducer::loadConfig(const std::string& configFile) {
     }
 }
 
-void KafkaProducer::onNewDatas(const std::string& dist,const std::string& source, const DataList& datas) {
+void KafkaProducer::onNewDatas(const std::string& dist,const std::string& source, const std::vector<std::pair<std::string,std::string>>& datas) {
     if (nullptr == mpProducer) {
         LogWarn("{}","Kafka生产者为nullptr！");
         return;
