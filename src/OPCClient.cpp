@@ -128,7 +128,7 @@ void OPCClient::loadConfig(const std::string& configFile)
                         for (auto&& j : nodeConfig)
                         {
                             node_code = j.as<std::string>();
-                            client->addNode(node_code);
+                            client->collectNode(node_code);
                         }
                     }
                     catch (YAML::Exception& e)
@@ -167,7 +167,7 @@ void OPCClient::stopHttpServer()
     }
 }
 
-std::string OPCClient::generateResponseContent(int code, const std::string& message, const std::string& data)
+std::string OPCClient::generateResponseContent(int code, const std::string& message, const std::string& data,bool isRaw)
 {
     rapidjson::StringBuffer sb;
     rapidjson::Writer writer(sb);
@@ -177,7 +177,12 @@ std::string OPCClient::generateResponseContent(int code, const std::string& mess
     writer.Key("message");
     writer.String(message.c_str());
     writer.Key("data");
-    writer.RawValue(data.c_str(), data.length(), rapidjson::kArrayType);
+    if (isRaw){
+        writer.RawValue(data.c_str(), data.length(), rapidjson::kArrayType);
+    }
+    else{
+        writer.String(data.c_str(), rapidjson::kObjectType);
+    }
     writer.EndObject();
     return sb.GetString();
 }
@@ -224,7 +229,7 @@ void OPCClient::initHttpServer()
                 exception.rethrow();
             }
             auto client = iter->second;
-            client->addNode(code);
+            client->collectNode(code);
             auto result =
                 generateResponseContent(200, fmt::format("{{添加OPC节点[machine:{}, code:{}]成功}}", machine, code));
             res.set_content(result, "application/json");
@@ -248,7 +253,7 @@ void OPCClient::initHttpServer()
                 exception.rethrow();
             }
             auto client = iter->second;
-            client->removeNode(code);
+            client->removeCollectingNode(code);
             auto result =
                 generateResponseContent(200, fmt::format("{{移除OPC节点[machine:{}, code:{}]成功}}", machine, code));
             res.set_content(result, "application/json");
@@ -276,7 +281,7 @@ void OPCClient::initHttpServer()
             rapidjson::StringBuffer sb;
             rapidjson::Writer writer(sb);
             writer.StartArray();
-            std::set<std::string> nodes = client->nodes();
+            std::set<std::string> nodes = client->allNodes();
             for (auto&& node : nodes)
             {
                 writer.String(node.c_str());
@@ -296,17 +301,21 @@ void OPCClient::initHttpServer()
                 exception.rethrow();
             }
             auto client = iter->second;
+            std::string name;
+            std::string type;
+            std::string value;
+            client->getNode(code, name, type, value);
             rapidjson::StringBuffer sb;
             rapidjson::Writer writer(sb);
-            writer.StartArray();
-            std::set<std::string> nodes = client->nodes();
-            for (auto&& node : nodes)
-            {
-                writer.String(node.c_str());
-            }
-            writer.EndArray();
-            res.set_content(generateResponseContent(200, fmt::format("OPC客户端[{}]节点[{}]查询成功", machine,code), sb.GetString()),
-                            "application/json");
+            writer.StartObject();
+            writer.Key("code");writer.String(code.c_str());
+            writer.Key("name");writer.String(name.c_str());
+            writer.Key("type");writer.String(type.c_str());
+            writer.Key("value");writer.String(value.c_str());
+            writer.EndObject();
+            res.set_content(
+                generateResponseContent(200, fmt::format("OPC客户端[{}]节点[{}]查询成功", machine, code), sb.GetString(),true),
+                "application/json");
         }
         else if ("url" == type)
         {

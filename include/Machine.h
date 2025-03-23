@@ -33,11 +33,13 @@ public:
 
     [[nodiscard]] std::string url() const;
 
-    void addNode(const std::string &node);
+    void collectNode(const std::string &node);
 
-    void removeNode(const std::string &node);
+    void removeCollectingNode(const std::string &node);
 
-    std::set<std::string> nodes();
+    std::set<std::string> collectingNodes();
+
+    std::set<std::string> allNodes();
 
     void setTopic(const std::string& topic);
 

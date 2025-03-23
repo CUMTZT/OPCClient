@@ -88,13 +88,13 @@ void Machine::setUrl(const std::string& url)
     mUrl = url;
 }
 
-void Machine::addNode(const std::string& node)
+void Machine::collectNode(const std::string& node)
 {
     std::scoped_lock lock(mClientLocker);
     mNodeCodes.insert(node);
 }
 
-void Machine::removeNode(const std::string& node)
+void Machine::removeCollectingNode(const std::string& node)
 {
     std::scoped_lock lock(mClientLocker);
     auto iter = mNodeCodes.find(node);
@@ -104,10 +104,16 @@ void Machine::removeNode(const std::string& node)
     }
 }
 
-std::set<std::string> Machine::nodes()
+std::set<std::string> Machine::collectingNodes()
 {
     std::scoped_lock lock(mClientLocker);
     return mNodeCodes;
+}
+
+std::set<std::string> Machine::allNodes()
+{
+    std::scoped_lock lock(mClientLocker);
+
 }
 
 void Machine::setTopic(const std::string& dist)

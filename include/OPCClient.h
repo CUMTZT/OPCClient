@@ -40,7 +40,7 @@ private:
 
     void stopHttpServer();
 
-    std::string generateResponseContent(int code, const std::string &message, const std::string& data = "");
+    std::string generateResponseContent(int code, const std::string &message, const std::string& data = "",bool isRaw = false);
 
     static OPCClient* mpInstance;
 
